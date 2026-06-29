@@ -1,13 +1,11 @@
 {
-  "name": "sinefa-chat-server",
+  "name": "my-chat",
   "version": "1.0.0",
-  "description": "Μια αυτόνομη εφαρμογή chat χωρίς εξωτερικές βάσεις",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "express": "^4.19.2",
-    "socket.io": "^4.7.5"
+    "express": "^4.19.2"
   }
 }

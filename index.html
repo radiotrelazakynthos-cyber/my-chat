@@ -121,89 +121,101 @@
 
     <div id="emoji-picker"></div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script>
-        const socket = io();
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, limit, doc, setDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyATL9Y_6Vn-IVK-TBHvPQxcjMu_kduCbcc",
+            authDomain: "chat-sinefa.firebaseapp.com",
+            projectId: "chat-sinefa",
+            storageBucket: "chat-sinefa.firebasestorage.app",
+            messagingSenderId: "142067892049",
+            appId: "1:142067892049:web:8bc03520d3d1c78d451d70"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
         let currentName = localStorage.getItem("chatUser");
-        let isLoggedIn = !!currentName;
+        let isLoggedIn = !!currentName && !currentName.startsWith("Guest_");
 
-        const chatBox = document.getElementById("chat-box");
-        const usersBox = document.getElementById("users-box");
+        async function updatePresence() {
+            if (!isLoggedIn) return;
+            try { await setDoc(doc(db, "online", currentName), { lastSeen: Date.now() }); } catch(e) {}
+        }
+        if (isLoggedIn) {
+            updatePresence();
+            setInterval(updatePresence, 8000);
+        }
 
-        // ΑΥΤΟ ΔΙΟΡΘΩΘΗΚΕ: Μόλις συνδεθεί το socket, αν είμαστε ήδη συνδεδεμένοι, στέλνει ΑΜΕΣΩΣ το όνομα στον server
-        socket.on('connect', () => {
-            if (isLoggedIn && currentName) {
-                socket.emit('register-user', currentName);
+        document.getElementById("enter-btn").onclick = async () => {
+            let newName = document.getElementById("username").value.trim();
+            if (!newName) return alert("Πρέπει να βάλεις όνομα!");
+            const welcomeDiv = document.getElementById("welcome-overlay");
+            welcomeDiv.innerHTML = `Καλώς ήρθες, <strong>${newName}</strong>! 🎉<br>Φόρτωση...`;
+            welcomeDiv.style.display = "flex";
+            if (currentName && currentName.startsWith("Guest_")) {
+                try { await deleteDoc(doc(db, "online", currentName)); } catch(e){}
             }
-        });
+            localStorage.setItem("chatUser", newName);
+            setTimeout(() => location.reload(), 1200);
+        };
 
         if (isLoggedIn) {
             document.getElementById("login-screen").style.display = "none";
             document.getElementById("chat-controls").style.display = "flex";
             document.getElementById("chat-cover").style.display = "none";
+        } else {
+            currentName = "Guest_" + Math.floor(Math.random() * 1000);
         }
 
-        document.getElementById("enter-btn").onclick = () => {
-            let newName = document.getElementById("username").value.trim();
-            if (!newName) return alert("Πρέπει να βάλεις όνομα!");
-            
-            const welcomeDiv = document.getElementById("welcome-overlay");
-            welcomeDiv.innerHTML = `Καλώς ήρθες, <strong>${newName}</strong>! 🎉<br>Φόρτωση...`;
-            welcomeDiv.style.display = "flex";
-            
-            localStorage.setItem("chatUser", newName);
-            // Στέλνουμε το όνομα πριν το reload
-            socket.emit('register-user', newName);
-            setTimeout(() => location.reload(), 1200);
-        };
-
-        function renderMessage(data) {
-            const isOwn = data.user === currentName;
-            const msgDiv = document.createElement("div");
-            msgDiv.className = `message ${isOwn ? 'own' : ''}`;
-            let html = `<strong>${data.user}:</strong> `;
-            if (data.text) html += data.text;
-            if (data.image) html += `<br><img src="${data.image}" style="max-width:280px; border-radius:8px; margin-top:6px;">`;
-            msgDiv.innerHTML = html;
-            chatBox.appendChild(msgDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        socket.on('chat-history', (history) => {
-            chatBox.innerHTML = "";
-            history.forEach(msg => renderMessage(msg));
-        });
-
-        socket.on('new-message', (msg) => {
-            if (isLoggedIn) {
-                renderMessage(msg);
-            }
-        });
-
-        socket.on('update-users', (usersList) => {
-            if (isLoggedIn) {
-                usersBox.innerHTML = "";
-                usersList.forEach(user => {
-                    usersBox.innerHTML += `<div style="margin:3px 0; padding:4px;">👤 ${user}</div>`;
-                });
-            }
-        });
-
-        function sendMsg(text, imageUrl = null) {
+        async function sendMessage(text, imageUrl = null) {
             if (!isLoggedIn || (!text && !imageUrl)) return;
-            socket.emit('send-message', { text: text, image: imageUrl });
+            try {
+                await addDoc(collection(db, "chat"), { user: currentName, text: text || "", image: imageUrl, timestamp: Date.now() });
+            } catch(e) {}
         }
 
         document.getElementById("send-btn").onclick = () => {
             const input = document.getElementById("msg-input");
-            sendMsg(input.value.trim());
+            sendMessage(input.value.trim());
             input.value = "";
         };
 
         document.getElementById("msg-input").addEventListener("keypress", e => {
             if (e.key === "Enter") document.getElementById("send-btn").click();
         });
+
+        const chatBox = document.getElementById("chat-box");
+        if (isLoggedIn) {
+            onSnapshot(query(collection(db, "chat"), orderBy("timestamp", "desc"), limit(50)), (snapshot) => {
+                chatBox.innerHTML = "";
+                snapshot.docs.reverse().forEach(d => {
+                    const data = d.data();
+                    const isOwn = data.user === currentName;
+                    const msgDiv = document.createElement("div");
+                    msgDiv.className = `message ${isOwn ? 'own' : ''}`;
+                    let html = `<strong>${data.user}:</strong> `;
+                    if (data.text) html += data.text;
+                    if (data.image) html += `<br><img src="${data.image}" style="max-width:280px; border-radius:8px; margin-top:6px;">`;
+                    msgDiv.innerHTML = html;
+                    chatBox.appendChild(msgDiv);
+                });
+                chatBox.scrollTop = chatBox.scrollHeight;
+            });
+        }
+
+        if (isLoggedIn) {
+            setInterval(() => {
+                const cutoff = Date.now() - 25000;
+                onSnapshot(query(collection(db, "online"), where("lastSeen", ">", cutoff)), (snapshot) => {
+                    const box = document.getElementById("users-box");
+                    box.innerHTML = "";
+                    snapshot.forEach(d => box.innerHTML += `<div style="margin:3px 0; padding:4px;">👤 ${d.id}</div>`);
+                });
+            }, 7000);
+        }
 
         const emojis = ["😀","😂","😍","🥰","😎","🔥","❤️","👍","👎","🎉","🚀","💯","🙌","😢","😱"];
         const picker = document.getElementById("emoji-picker");
@@ -229,7 +241,7 @@
             const file = e.target.files[0];
             if (!file || !isLoggedIn) return;
             const reader = new FileReader();
-            reader.onload = (ev) => sendMsg("", ev.target.result);
+            reader.onload = (ev) => sendMessage("", ev.target.result);
             reader.readAsDataURL(file);
         };
 
