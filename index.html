@@ -224,13 +224,20 @@
                     htmlContent += `</div>`;
                     
                     newestMsgId = data.id;
-                    lastMessageUser = data.user; // Κρατάμε ποιος έστειλε το τελευταίο μήνυμα στη λίστα
+                    lastMessageUser = data.user;
                 });
 
-                chatBox.innerHTML = htmlContent;
-                chatBox.scrollTop = chatBox.scrollHeight;
+                // Έλεγχος αν ο χρήστης είναι ήδη σκρολαρισμένος κάτω-κάτω (με ανοχή 30px)
+                const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight <= 30;
 
-                // ΔΙΟΡΘΩΣΗ ΗΧΟΥ: Παίζει ΜΟΝΟ αν το μήνυμα είναι νέο ΚΑΙ ο αποστολέας ΔΕΝ είσαι εσύ
+                chatBox.innerHTML = htmlContent;
+
+                // Κατέβασμα μπάρας: Μόνο στην πρώτη φόρτωση Ή αν είμαστε ήδη κάτω Ή αν άλλαξε το ID του τελευταίου μηνύματος
+                if (initialLoad || isAtBottom || newestMsgId !== lastKnownMsgId) {
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                }
+
+                // Παίζει ήχος μόνο αν το μήνυμα είναι νέο και δεν είναι δικό μας
                 if (!initialLoad && newestMsgId !== lastKnownMsgId && lastMessageUser !== currentName) {
                     notificationSound.play().catch(e => console.log("Sound played after interaction."));
                 }
