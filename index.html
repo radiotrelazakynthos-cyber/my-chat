@@ -41,7 +41,6 @@
             scrollbar-color: #00ff00 #111;
         }
         #users-list::-webkit-scrollbar { width: 6px; }
-        #users-list::-webkit-scrollbar-track { background: #111; }
 
         .user-row {
             margin: 5px 0; padding: 6px; border: 1px solid #00ff00; 
@@ -63,14 +62,20 @@
             border-style: solid; background: rgba(0,100,0,0.3); color: #fff;
         }
 
+        /* Κουμπί BAN στυλ */
+        .ban-btn {
+            background: #ff3333; color: white; border: none; border-radius: 4px;
+            padding: 2px 6px; font-size: 11px; cursor: pointer; font-weight: bold;
+            position: absolute; right: 5px; z-index: 10; display: none;
+        }
+        .ban-btn:hover { background: #ff0000; }
+
         .unread-badge {
             background: #ff3333; color: white; font-size: 11px; padding: 2px 5px;
-            border-radius: 4px; display: inline-block; position: absolute; right: 5px;
+            border-radius: 4px; display: inline-block; position: absolute; right: 45px;
             animation: blinker 1.5s linear infinite;
         }
-        @keyframes blinker {
-            50% { opacity: 0.4; }
-        }
+        @keyframes blinker { 50% { opacity: 0.4; } }
 
         .avatar {
             width: 30px; height: 30px; border-radius: 50%; border: 1px solid #00ff00;
@@ -94,7 +99,7 @@
         }
         #username {
             height: 40px; padding: 8px; background: #111; color: #0f0; 
-            border: 2px solid #00ff00; border-radius: 8px; box-sizing: border-box;
+            border: 2px solid #00ff00; border-radius: 8px; box-sizing: border-box; width: 220px;
         }
         #chat-controls {
             display: flex; gap: 8px; margin-bottom: 10px; justify-content: center; 
@@ -127,10 +132,7 @@
             flex-direction: row-reverse;
         }
         .message-content { display: flex; flex-direction: column; }
-
-        .message.private-msg {
-            border: 1px dashed #ff00ff; background: rgba(60, 0, 60, 0.7);
-        }
+        .message.private-msg { border: 1px dashed #ff00ff; background: rgba(60, 0, 60, 0.7); }
         .message.own.private-msg { background: rgba(100, 0, 100, 0.85); }
         
         #emoji-picker {
@@ -141,7 +143,6 @@
         .emoji { font-size: 24px; cursor: pointer; padding: 4px; }
         .emoji:hover { background: #00ff00; color: #000; border-radius: 4px; }
         .back-btn { background: #ff3333; color: white; padding: 4px 10px; height: auto; font-size: 13px; }
-        .back-btn:hover { background: #ff0000; }
     </style>
     <style>
         body {
@@ -172,7 +173,7 @@
         </div>
          
         <div id="login-screen">
-            <input type="text" id="username" placeholder="Το όνομά σου..." maxlength="20">
+            <input type="text" id="username" placeholder="Όνομα... (ή sakis:κωδικός)">
             <button id="enter-btn">Είσοδος</button>
         </div>
          
@@ -198,8 +199,16 @@
     <div id="emoji-picker"></div>
 
     <script>
+        // 🔐 Δημιουργία Μοναδικού Token Συσκευής για το Ban αν δεν υπάρχει
+        let deviceToken = localStorage.getItem("chatDeviceToken");
+        if (!deviceToken) {
+            deviceToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
+            localStorage.setItem("chatDeviceToken", deviceToken);
+        }
+
         let currentName = localStorage.getItem("chatUser");
         let currentAvatar = localStorage.getItem("chatAvatar") || ""; 
+        let isAdmin = localStorage.getItem("chatIsAdmin") === "true";
         let isLoggedIn = !!currentName && !currentName.startsWith("Guest_");
         let activePrivateTarget = null; 
 
@@ -225,32 +234,17 @@
             reader.readAsDataURL(file);
         };
 
-        function triggerAvatarUpload() {
-            myAvatarInput.click();
-        }
-
-        const volumeControl = document.getElementById("volume-control");
-        const volumeIcon = document.getElementById("volume-icon");
-
-        volumeControl.addEventListener("input", (e) => {
-            const val = parseFloat(e.target.value);
-            notificationSound.volume = val;
-            if (val === 0) volumeIcon.textContent = "🔇";
-            else if (val < 0.4) volumeIcon.textContent = "🔈";
-            else volumeIcon.textContent = "🔊";
-        });
-        volumeControl.addEventListener("change", () => {
-            if (notificationSound.volume > 0) notificationSound.play().catch(e => {});
-        });
+        function triggerAvatarUpload() { myAvatarInput.click(); }
 
         async function updatePresence() {
             if (!isLoggedIn) return;
             try {
-                await fetch('/api/presence', {
+                let res = await fetch('/api/presence', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user: currentName, avatar: currentAvatar })
+                    body: JSON.stringify({ user: currentName, avatar: currentAvatar, token: deviceToken })
                 });
+                if (res.status === 403) handleBannedUser();
             } catch(e) {}
         }
 
@@ -275,13 +269,42 @@
 
                     if (name !== currentName) {
                         const badge = unreadFromUsers.has(name) ? ` <span class="unread-badge">Νέο!</span>` : '';
-                        box.innerHTML += `<div class="user-row" onclick="startPrivateChat('${name}')">${imgTag} <span>${name}</span>${badge}</div>`;
+                        
+                        // Αν είσαι Admin, εμφανίζεται το κουμπί BAN (🚫)
+                        let banBtnHtml = isAdmin ? `<button class="ban-btn" style="display:inline-block;" onclick="executeBan(event, '${name}')">🚫</button>` : '';
+                        
+                        box.innerHTML += `<div class="user-row" onclick="startPrivateChat('${name}')">${imgTag} <span>${name}</span>${badge}${banBtnHtml}</div>`;
                     } else {
                         let myImg = currentAvatar ? `<img src="${currentAvatar}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">📷</div>`;
-                        box.innerHTML += `<div class="my-row" onclick="triggerAvatarUpload()" title="Κλικ για προσθήκη/αλλαγή φωτογραφίας">${myImg} <span>${name} (Εσύ)</span></div>`;
+                        box.innerHTML += `<div class="my-row" onclick="triggerAvatarUpload()">${myImg} <span>${name} (Εσύ)</span></div>`;
                     }
                 });
             } catch(e) {}
+        }
+
+        // Λειτουργία BAN από τον Admin
+        async function executeBan(event, username) {
+            event.stopPropagation(); // Σταματάει το άνοιγμα του πριβέ chat
+            if (!confirm(`Θέλεις σίγουρα να αποκλείσεις (BAN) οριστικά τον χρήστη ${username};`)) return;
+
+            try {
+                let res = await fetch('/api/ban', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ targetUser: username, adminName: currentName, adminToken: deviceToken })
+                });
+                let data = await res.json();
+                if (data.success) {
+                    alert(`Ο χρήστης ${username} αποκλείστηκε επιτυχώς!`);
+                    fetchPresence();
+                }
+            } catch(e) { alert("Σφάλμα κατά το Ban"); }
+        }
+
+        function handleBannedUser() {
+            localStorage.clear();
+            alert("Έχεις αποκλειστεί οριστικά (BAN) από αυτό το chat!");
+            location.reload();
         }
 
         function startPrivateChat(targetUser) {
@@ -314,28 +337,43 @@
         }
 
         document.getElementById("enter-btn").onclick = async () => {
-            let newName = document.getElementById("username").value.trim();
-            if (!newName) return alert("Πρέπει να βάλεις όνομα!");
-            const welcomeDiv = document.getElementById("welcome-overlay");
-            welcomeDiv.innerHTML = `Καλώς ήρθες, <strong>${newName}</strong>! 🎉<br>Φόρτωση...`;
-            welcomeDiv.style.display = "flex";
-            
-            localStorage.setItem("chatUser", newName);
-            setTimeout(() => location.reload(), 1200);
+            let rawInput = document.getElementById("username").value.trim();
+            if (!rawInput) return alert("Πρέπει να βάλεις όνομα!");
+
+            try {
+                let res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ loginString: rawInput, token: deviceToken })
+                });
+                let data = await res.json();
+                
+                if (!data.success) {
+                    if (data.error === 'banned') handleBannedUser();
+                    return;
+                }
+
+                localStorage.setItem("chatUser", data.username);
+                localStorage.setItem("chatIsAdmin", data.isAdmin ? "true" : "false");
+
+                const welcomeDiv = document.getElementById("welcome-overlay");
+                welcomeDiv.innerHTML = data.isAdmin ? `Καλώς όρισες Αρχηγέ <strong>${data.username}</strong>! 👑<br>Φόρτωση...` : `Καλώς ήρθες, <strong>${data.username}</strong>! 🎉<br>Φόρτωση...`;
+                welcomeDiv.style.display = "flex";
+                
+                setTimeout(() => location.reload(), 1200);
+            } catch(e) { alert("Σφάλμα σύνδεσης"); }
         };
 
         if (isLoggedIn) {
             document.getElementById("login-screen").style.display = "none";
             document.getElementById("chat-controls").style.display = "flex";
             document.getElementById("chat-cover").style.display = "none";
-        } else {
-            currentName = "Guest_" + Math.floor(Math.random() * 1000);
         }
 
         async function sendMessage(text, imageUrl = null) {
             if (!isLoggedIn || (!text && !imageUrl)) return;
             try {
-                await fetch('/api/messages', {
+                let res = await fetch('/api/messages', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
@@ -343,9 +381,11 @@
                         avatar: currentAvatar, 
                         text: text || "", 
                         image: imageUrl,
-                        to: activePrivateTarget 
+                        to: activePrivateTarget,
+                        token: deviceToken
                     })
                 });
+                if (res.status === 403) handleBannedUser();
                 fetchMessages();
             } catch(e) {}
         }
@@ -364,9 +404,10 @@
         async function fetchMessages() {
             if (!isLoggedIn) return;
             try {
-                const res = await fetch(`/api/messages?user=${encodeURIComponent(currentName)}`);
-                const messages = await res.json();
+                const res = await fetch(`/api/messages?user=${encodeURIComponent(currentName)}&token=${deviceToken}`);
+                if (res.status === 403) handleBannedUser();
                 
+                const messages = await res.json();
                 let htmlContent = "";
                 let hasIncomingNewPrivate = false;
                 let shouldPlaySound = false;
@@ -381,12 +422,10 @@
 
                     if (isNew) {
                         knownMessageIds.add(m.id);
-
                         if (!isOwn && !initialLoad) {
                             if (!m.to && activePrivateTarget === null) shouldPlaySound = true;
                             else if (m.to === currentName) shouldPlaySound = true;
                         }
-
                         if (m.to === currentName && m.user !== activePrivateTarget) {
                             if (!unreadFromUsers.has(m.user)) {
                                 unreadFromUsers.add(m.user);
@@ -396,9 +435,7 @@
                     }
                 });
 
-                if (hasIncomingNewPrivate) {
-                    fetchPresence(); 
-                }
+                if (hasIncomingNewPrivate) fetchPresence(); 
 
                 const visibleMessages = messages.filter(m => {
                     if (activePrivateTarget === null) return !m.to; 
@@ -424,13 +461,8 @@
                 const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight <= 30;
                 chatBox.innerHTML = htmlContent;
 
-                if (initialLoad || isAtBottom) {
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                }
-
-                if (shouldPlaySound) {
-                    notificationSound.play().catch(e => console.log("Sound interaction block"));
-                }
+                if (initialLoad || isAtBottom) chatBox.scrollTop = chatBox.scrollHeight;
+                if (shouldPlaySound) notificationSound.play().catch(e => {});
                 
                 initialLoad = false;
             } catch(e) {}
@@ -453,6 +485,18 @@
             location.reload();
         };
 
+        // Volume Controls
+        const volumeControl = document.getElementById("volume-control");
+        const volumeIcon = document.getElementById("volume-icon");
+        volumeControl.addEventListener("input", (e) => {
+            const val = parseFloat(e.target.value);
+            notificationSound.volume = val;
+            if (val === 0) volumeIcon.textContent = "🔇";
+            else if (val < 0.4) volumeIcon.textContent = "🔈";
+            else volumeIcon.textContent = "🔊";
+        });
+
+        // Emojis
         const emojis = ["😀","😂","😍","🥰","😎","🔥","❤️","👍","👎","🎉","🚀","💯","🙌","😢","😱"];
         const picker = document.getElementById("emoji-picker");
         emojis.forEach(emo => {
@@ -465,13 +509,13 @@
             };
             picker.appendChild(span);
         });
-
         document.getElementById("emoji-btn").onclick = (e) => {
             e.stopPropagation();
             picker.style.display = picker.style.display === "flex" ? "none" : "flex";
         };
         document.addEventListener("click", () => picker.style.display = "none");
 
+        // Images
         document.getElementById("image-btn").onclick = () => document.getElementById("image-upload").click();
         document.getElementById("image-upload").onchange = (e) => {
             const file = e.target.files[0];
@@ -481,18 +525,13 @@
             reader.readAsDataURL(file);
         };
 
+        // Theme Toggle
         let isDark = true;
         document.getElementById("toggle-theme").onclick = () => {
             isDark = !isDark;
-            const btn = document.getElementById("toggle-theme");
-            btn.textContent = isDark ? "🌙" : "☀️";
-            if (isDark) {
-                document.body.style.backgroundColor = "#000";
-                document.getElementById("chat-wrapper").style.backgroundColor = "rgba(0,0,0,0.95)";
-            } else {
-                document.body.style.backgroundColor = "#222233";
-                document.getElementById("chat-wrapper").style.backgroundColor = "rgba(40,40,60,0.95)";
-            }
+            document.getElementById("toggle-theme").textContent = isDark ? "🌙" : "☀️";
+            document.body.style.backgroundColor = isDark ? "#000" : "#222233";
+            document.getElementById("chat-wrapper").style.backgroundColor = isDark ? "rgba(0,0,0,0.95)" : "rgba(40,40,60,0.95)";
         };
     </script>
 </body>
