@@ -106,7 +106,7 @@
             height: 40px; padding: 0 15px; background: #00ff00; color: #000;
             border: none; border-radius: 8px; font-weight: bold; cursor: pointer;
         }
-        button:hover { background: #33ff33; }
+        button:hover:not(:disabled) { background: #33ff33; }
        
         .volume-container {
             display: flex; align-items: center; gap: 5px; background: #111;
@@ -114,45 +114,25 @@
         }
         .volume-container span { font-size: 16px; color: #00ff00; }
         .volume-slider { width: 70px; cursor: pointer; accent-color: #00ff00; }
-        .message {
-            max-width: 80%; padding: 8px 12px; border-radius: 12px;
-            background: rgba(0, 50, 0, 0.7); align-self: flex-start;
-            display: flex; gap: 10px; align-items: flex-start;
-        }
-        .message.own {
-            background: rgba(0, 100, 0, 0.85); align-self: flex-end;
-            flex-direction: row-reverse;
-        }
-        .message-content { display: flex; flex-direction: column; }
-        .message.private-msg { border: 1px dashed #ff00ff; background: rgba(60, 0, 60, 0.7); }
-        .message.own.private-msg { background: rgba(100, 0, 100, 0.85); }
-       
-        #emoji-picker {
-            display: none; position: absolute; bottom: 60px; background: #111;
-            border: 2px solid #00ff00; padding: 10px; border-radius: 10px;
-            max-width: 300px; flex-wrap: wrap; gap: 5px; z-index: 200;
-        }
-        .emoji { font-size: 24px; cursor: pointer; padding: 4px; }
-        .emoji:hover { background: #00ff00; color: #000; border-radius: 4px; }
-        .back-btn { background: #ff3333; color: white; padding: 4px 10px; height: auto; font-size: 13px; }
 
-        /* === LOADING ΓΙΑ ΕΙΚΟΝΑ === */
+        /* Loading για εικόνα */
         #image-upload-btn {
             position: relative;
-            min-width: 50px;
+            min-width: 52px;
         }
         #image-upload-btn.loading {
-            opacity: 0.7;
+            opacity: 0.75;
             pointer-events: none;
-            background: #00aa00;
+            background: #008800;
         }
         #image-upload-btn.loading::after {
-            content: " ⏳";
-            animation: spin 1.2s linear infinite;
+            content: " Ανεβαίνει...";
+            font-size: 13px;
+            animation: pulse 1.5s infinite;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
         }
     </style>
     <style>
@@ -198,7 +178,6 @@
                 <input type="range" id="volume-control" class="volume-slider" min="0" max="1" step="0.1" value="0.5">
             </div>
             
-            <!-- Ενημερωμένο κουμπί με loading -->
             <button id="image-upload-btn">🖼️</button>
             <input type="file" id="image-upload" accept="image/*,image/gif" style="display:none;">
             
@@ -225,6 +204,7 @@
         let unreadFromUsers = new Set();
         let knownMessageIds = new Set();
         let globalUsersAvatars = {};
+
         const myAvatarInput = document.getElementById("my-avatar-input");
         myAvatarInput.onchange = (e) => {
             const file = e.target.files[0];
@@ -238,7 +218,9 @@
             };
             reader.readAsDataURL(file);
         };
+
         function triggerAvatarUpload() { myAvatarInput.click(); }
+
         async function updatePresence() {
             if (!isLoggedIn) return;
             try {
@@ -250,6 +232,7 @@
                 if (res.status === 403) handleBannedUser();
             } catch(e) {}
         }
+
         async function fetchPresence() {
             if (!isLoggedIn) return;
             try {
@@ -261,10 +244,7 @@
                 usersData.forEach(u => {
                     let name = u.user;
                     let av = u.avatar || "";
-                   
-                    if(name !== currentName && av) {
-                        globalUsersAvatars[name] = av;
-                    }
+                    if(name !== currentName && av) globalUsersAvatars[name] = av;
                    
                     let finalAvatar = name === currentName ? currentAvatar : (av || globalUsersAvatars[name] || "");
                     let imgTag = finalAvatar ? `<img src="${finalAvatar}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
@@ -279,6 +259,7 @@
                 });
             } catch(e) {}
         }
+
         async function executeBan(event, username) {
             event.stopPropagation();
             if (!confirm(`Θέλεις σίγουρα να αποκλείσεις (BAN) οριστικά τον χρήστη ${username};`)) return;
@@ -295,11 +276,13 @@
                 }
             } catch(e) { alert("Σφάλμα κατά το Ban"); }
         }
+
         function handleBannedUser() {
             localStorage.clear();
             alert("Έχεις αποκλειστεί οριστικά (BAN) από αυτό το chat!");
             location.reload();
         }
+
         function startPrivateChat(targetUser) {
             activePrivateTarget = targetUser;
             unreadFromUsers.delete(targetUser);
@@ -310,6 +293,7 @@
             initialLoad = true;
             fetchMessages();
         }
+
         document.getElementById("back-to-global").onclick = () => {
             activePrivateTarget = null;
             document.getElementById("room-title").textContent = `Δωμάτιο: Γενικό Chat`;
@@ -319,6 +303,7 @@
             initialLoad = true;
             fetchMessages();
         };
+
         if (isLoggedIn) {
             updatePresence();
             setInterval(updatePresence, 4000);
@@ -326,6 +311,7 @@
             setInterval(fetchPresence, 4000);
             document.getElementById("chat-header").style.display = "flex";
         }
+
         document.getElementById("enter-btn").onclick = async () => {
             let rawInput = document.getElementById("username").value.trim();
             if (!rawInput) return alert("Πρέπει να βάλεις όνομα!");
@@ -340,7 +326,6 @@
                 if (!data.success) {
                     if (data.error === 'banned') handleBannedUser();
                     document.getElementById("username").value = "";
-                    document.getElementById("username").placeholder = "Το όνομά σου...";
                     return;
                 }
                 localStorage.setItem("chatUser", data.username);
@@ -348,18 +333,19 @@
                 const welcomeDiv = document.getElementById("welcome-overlay");
                 welcomeDiv.innerHTML = data.isAdmin ? `Καλώς ορισες Αρχηγέ <strong>${data.username}</strong>! 👑<br>Φόρτωση...` : `Καλώς ήρθες, <strong>${data.username}</strong>! 🎉<br>Φόρτωση...`;
                 welcomeDiv.style.display = "flex";
-               
                 setTimeout(() => location.reload(), 1200);
             } catch(e) { alert("Σφάλμα σύνδεσης"); }
         };
+
         if (isLoggedIn) {
             document.getElementById("login-screen").style.display = "none";
             document.getElementById("chat-controls").style.display = "flex";
             document.getElementById("chat-cover").style.display = "none";
         } else {
             currentName = "Guest_" + Math.floor(Math.random() * 1000);
-            document.getElementById("username").placeholder = "Το όνομά σου...";
         }
+
+        // Κύρια συνάρτηση αποστολής (τώρα επιστρέφει Promise)
         async function sendMessage(text, imageUrl = null) {
             if (!isLoggedIn || (!text && !imageUrl)) return;
             try {
@@ -377,16 +363,21 @@
                 });
                 if (res.status === 403) handleBannedUser();
                 fetchMessages();
-            } catch(e) {}
+            } catch(e) {
+                console.error(e);
+            }
         }
+
         document.getElementById("send-btn").onclick = () => {
             const input = document.getElementById("msg-input");
             sendMessage(input.value.trim());
             input.value = "";
         };
+
         document.getElementById("msg-input").addEventListener("keypress", e => {
             if (e.key === "Enter") document.getElementById("send-btn").click();
         });
+
         const chatBox = document.getElementById("chat-box");
         async function fetchMessages() {
             if (!isLoggedIn) return;
@@ -398,12 +389,11 @@
                 let htmlContent = "";
                 let hasIncomingNewPrivate = false;
                 let shouldPlaySound = false;
+
                 messages.forEach(m => {
                     const isOwn = m.user === currentName;
                     const isNew = !knownMessageIds.has(m.id);
-                    if (m.avatar && m.user !== currentName) {
-                        globalUsersAvatars[m.user] = m.avatar;
-                    }
+                    if (m.avatar && m.user !== currentName) globalUsersAvatars[m.user] = m.avatar;
                     if (isNew) {
                         knownMessageIds.add(m.id);
                         if (!isOwn && !initialLoad) {
@@ -418,15 +408,17 @@
                         }
                     }
                 });
+
                 if (hasIncomingNewPrivate) fetchPresence();
+
                 const visibleMessages = messages.filter(m => {
                     if (activePrivateTarget === null) return !m.to;
                     else return m.to === activePrivateTarget || (m.user === activePrivateTarget && m.to === currentName);
                 });
+
                 visibleMessages.forEach(data => {
                     const isOwn = data.user === currentName;
                     const isPrivate = !!data.to;
-                   
                     let userAv = isOwn ? currentAvatar : (data.avatar || globalUsersAvatars[data.user] || "");
                     let msgAvatarTag = userAv ? `<img src="${userAv}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
                     htmlContent += `<div class="message ${isOwn ? 'own' : ''} ${isPrivate ? 'private-msg' : ''}">`;
@@ -437,6 +429,7 @@
                     if (data.image) htmlContent += `<img src="${data.image}" style="max-width:280px; border-radius:8px; margin-top:6px;">`;
                     htmlContent += `</div></div>`;
                 });
+
                 const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight <= 30;
                 chatBox.innerHTML = htmlContent;
                 if (initialLoad || isAtBottom) chatBox.scrollTop = chatBox.scrollHeight;
@@ -445,10 +438,12 @@
                 initialLoad = false;
             } catch(e) {}
         }
+
         if (isLoggedIn) {
             fetchMessages();
             setInterval(fetchMessages, 2000);
         }
+
         document.getElementById("exit-btn").onclick = async () => {
             try {
                 await fetch('/api/logout', {
@@ -460,7 +455,8 @@
             localStorage.clear();
             location.reload();
         };
-        // Volume Control
+
+        // Volume
         const volumeControl = document.getElementById("volume-control");
         const volumeIcon = document.getElementById("volume-icon");
         volumeControl.addEventListener("input", (e) => {
@@ -470,8 +466,9 @@
             else if (val < 0.4) volumeIcon.textContent = "🔈";
             else volumeIcon.textContent = "🔊";
             notificationSound.currentTime = 0;
-            notificationSound.play().catch(err => {});
+            notificationSound.play().catch(() => {});
         });
+
         // Emojis
         const emojis = ["😀","😂","😍","🥰","😎","🔥","❤️","👍","👎","🎉","🚀","💯","🙌","😢","😱"];
         const picker = document.getElementById("emoji-picker");
@@ -491,7 +488,7 @@
         };
         document.addEventListener("click", () => picker.style.display = "none");
 
-        // ==================== ΝΕΟ IMAGE UPLOAD ΜΕ LOADING ====================
+        // ====================== ΒΕΛΤΙΩΜΕΝΟ IMAGE UPLOAD ======================
         const imageBtn = document.getElementById("image-upload-btn");
         const imageInput = document.getElementById("image-upload");
 
@@ -504,30 +501,26 @@
             const file = e.target.files[0];
             if (!file || !isLoggedIn) return;
 
-            // Ενεργοποίηση loading
+            const originalText = imageBtn.textContent;
             imageBtn.classList.add("loading");
 
             try {
                 const reader = new FileReader();
-                
-                await new Promise((resolve, reject) => {
-                    reader.onload = (ev) => {
-                        sendMessage("", ev.target.result);
-                        resolve();
-                    };
+                const dataUrl = await new Promise((resolve, reject) => {
+                    reader.onload = () => resolve(reader.result);
                     reader.onerror = reject;
                     reader.readAsDataURL(file);
                 });
 
+                // Τώρα περιμένουμε μέχρι να τελειώσει και η αποστολή στο server
+                await sendMessage("", dataUrl);
+
             } catch (err) {
-                console.error("Error uploading image:", err);
-                alert("Σφάλμα κατά την επεξεργασία της εικόνας.");
+                console.error(err);
+                alert("Σφάλμα κατά την ανάγνωση/αποστολή της εικόνας.");
             } finally {
-                // Απενεργοποίηση loading
-                setTimeout(() => {
-                    imageBtn.classList.remove("loading");
-                    imageInput.value = ""; // reset για να μπορεί να ξαναφορτώσει ίδια εικόνα
-                }, 800);
+                imageBtn.classList.remove("loading");
+                imageInput.value = "";
             }
         };
         // ===================================================================
