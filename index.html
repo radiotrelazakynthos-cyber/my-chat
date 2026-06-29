@@ -182,16 +182,14 @@
             <input type="text" id="msg-input" placeholder="Γράψε μήνυμα...">
             <button id="send-btn">📤 Αποστολή</button>
             <button id="emoji-btn">😀</button>
-            
-            <div class="volume-container">
+            <button id="image-btn">🖼️</button>
+            <input type="file" id="image-upload" accept="image/*,image/gif" style="display:none;">
+            <button id="toggle-theme">🌙</button>
+			<div class="volume-container">
                 <span id="volume-icon">🔊</span>
                 <input type="range" id="volume-control" class="volume-slider" min="0" max="1" step="0.1" value="0.5">
             </div>
-
-            <button id="image-btn">🖼️</button>
-            <input type="file" id="image-upload" accept="image/*,image/gif" style="display:none;">
-            <button id="exit-btn">🚪 Έξοδος</button>
-            <button id="toggle-theme">🌙</button>
+			<button id="exit-btn">🚪 Έξοδος</button>
         </div>
     </div>
 
