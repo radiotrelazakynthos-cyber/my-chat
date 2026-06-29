@@ -65,7 +65,7 @@
         .ban-btn {
             background: #ff3333; color: white; border: none; border-radius: 4px;
             padding: 2px 6px; font-size: 11px; cursor: pointer; font-weight: bold;
-            position: absolute; right: 5px; z-index: 10; display: inline-block;
+            position: absolute; right: 5px; z-index: 10; display: none;
         }
         .ban-btn:hover { background: #ff0000; }
 
@@ -267,8 +267,7 @@
 
                     if (name !== currentName) {
                         const badge = unreadFromUsers.has(name) ? ` <span class="unread-badge">Νέο!</span>` : '';
-                        // Το κουμπί εμφανίζεται αν είσαι admin
-                        let banBtnHtml = isAdmin ? `<button class="ban-btn" onclick="executeBan(event, '${name}')">🚫</button>` : '';
+                        let banBtnHtml = isAdmin ? `<button class="ban-btn" style="display:inline-block;" onclick="executeBan(event, '${name}')">🚫</button>` : '';
                         box.innerHTML += `<div class="user-row" onclick="startPrivateChat('${name}')">${imgTag} <span>${name}</span>${badge}${banBtnHtml}</div>`;
                     } else {
                         let myImg = currentAvatar ? `<img src="${currentAvatar}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">📷</div>`;
@@ -292,8 +291,6 @@
                 if (data.success) {
                     alert(`Ο χρήστης ${username} αποκλείστηκε επιτυχώς!`);
                     fetchPresence();
-                } else {
-                    alert("Δεν έχεις δικαίωμα ή το Ban απέτυχε.");
                 }
             } catch(e) { alert("Σφάλμα κατά το Ban"); }
         }
@@ -487,6 +484,7 @@
             location.reload();
         };
 
+        // 🔥 ΕΔΩ ΕΙΝΑΙ Ο ΗΧΟΣ ΠΟΥ ΦΤΙΑΧΤΗΚΕ ΓΙΑ ΝΑ ΠΑΙΖΕΙ ΟΤΑΝ ΚΟΥΝΑΣ ΤΗ ΜΠΑΡΑ!
         const volumeControl = document.getElementById("volume-control");
         const volumeIcon = document.getElementById("volume-icon");
         volumeControl.addEventListener("input", (e) => {
@@ -496,6 +494,7 @@
             else if (val < 0.4) volumeIcon.textContent = "🔈";
             else volumeIcon.textContent = "🔊";
             
+            // Παίζει το δείγμα ήχου για να ακούς πού βρίσκεται η ένταση
             notificationSound.currentTime = 0;
             notificationSound.play().catch(err => {});
         });
