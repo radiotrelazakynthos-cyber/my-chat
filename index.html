@@ -53,7 +53,6 @@
             background: #00ff00; color: #000;
         }
         
-        /* Ειδικό στυλ για τη σειρά "Εσύ" ώστε να φαίνεται ότι πατιέται */
         .my-row {
             margin: 5px 0; padding: 6px; border: 1px dashed #00ff00; 
             border-radius: 5px; cursor: pointer; background: rgba(0,20,0,0.2);
@@ -73,7 +72,6 @@
             50% { opacity: 0.4; }
         }
 
-        /* Στυλ για τα Avatars */
         .avatar {
             width: 30px; height: 30px; border-radius: 50%; border: 1px solid #00ff00;
             object-fit: cover; background: #222; flex-shrink: 0;
@@ -119,7 +117,6 @@
         .volume-container span { font-size: 16px; color: #00ff00; }
         .volume-slider { width: 70px; cursor: pointer; accent-color: #00ff00; }
 
-        /* Μηνύματα με Avatar */
         .message { 
             max-width: 80%; padding: 8px 12px; border-radius: 12px; 
             background: rgba(0, 50, 0, 0.7); align-self: flex-start;
@@ -212,9 +209,10 @@
         let initialLoad = true;
         let unreadFromUsers = new Set(); 
         let knownMessageIds = new Set();
-        let globalUsersAvatars = {}; 
+        
+        // Φόρτωση των avatars από τη μνήμη του browser για να μην χάνονται στα refreshes
+        let globalUsersAvatars = JSON.parse(localStorage.getItem("cachedAvatars") || "{}"); 
 
-        // Λειτουργία για το κρυφό input του Avatar
         const myAvatarInput = document.getElementById("my-avatar-input");
         myAvatarInput.onchange = (e) => {
             const file = e.target.files[0];
@@ -223,13 +221,14 @@
             reader.onload = (ev) => {
                 currentAvatar = ev.target.result;
                 localStorage.setItem("chatAvatar", currentAvatar);
-                updatePresence(); // Στέλνει αμέσως τη νέα φώτο στον server
-                fetchPresence();  // Ανανεώνει τη λίστα για να τη δεις αμέσως
+                updatePresence(); 
+                fetchPresence();  
+                // Στέλνουμε αμέσως ένα κενό ping μήνυμα για να μάθουν όλοι τη νέα μας φωτογραφία
+                sendMessage(""); 
             };
             reader.readAsDataURL(file);
         };
 
-        // Συνάρτηση που καλείται όταν κάνεις κλικ στο όνομά σου
         function triggerAvatarUpload() {
             myAvatarInput.click();
         }
@@ -271,21 +270,26 @@
                     let name = typeof u === 'object' ? u.user : u;
                     let av = typeof u === 'object' ? (u.avatar || "") : "";
                     
+                    // Αν ο server μας έστειλε avatar, το αποθηκεύουμε
                     if(name !== currentName && av) {
                         globalUsersAvatars[name] = av;
                     }
-
-                    let imgTag = av ? `<img src="${av}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
+                    
+                    // Παίρνουμε το avatar είτε από τον server είτε από την έξυπνη τοπική μνήμη μας
+                    let finalAvatar = name === currentName ? currentAvatar : (av || globalUsersAvatars[name] || "");
+                    let imgTag = finalAvatar ? `<img src="${finalAvatar}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
 
                     if (name !== currentName) {
                         const badge = unreadFromUsers.has(name) ? ` <span class="unread-badge">Νέο!</span>` : '';
                         box.innerHTML += `<div class="user-row" onclick="startPrivateChat('${name}')">${imgTag} <span>${name}</span>${badge}</div>`;
                     } else {
-                        // Το δικό σου όνομα γίνεται κλικάσιμο (.my-row) για αλλαγή φωτογραφίας
                         let myImg = currentAvatar ? `<img src="${currentAvatar}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">📷</div>`;
                         box.innerHTML += `<div class="my-row" onclick="triggerAvatarUpload()" title="Κλικ για προσθήκη/αλλαγή φωτογραφίας">${myImg} <span>${name} (Εσύ)</span></div>`;
                     }
                 });
+                
+                // Αποθήκευση της λίστας φωτογραφιών τοπικά
+                localStorage.setItem("cachedAvatars", JSON.stringify(globalUsersAvatars));
             } catch(e) {}
         }
 
@@ -338,7 +342,7 @@
         }
 
         async function sendMessage(text, imageUrl = null) {
-            if (!isLoggedIn || (!text && !imageUrl)) return;
+            if (!isLoggedIn || (text === null && !imageUrl)) return;
             try {
                 await fetch('/api/messages', {
                     method: 'POST',
@@ -346,7 +350,7 @@
                     body: JSON.stringify({ 
                         user: currentName, 
                         avatar: currentAvatar, 
-                        text: text || "", 
+                        text: text, 
                         image: imageUrl,
                         to: activePrivateTarget 
                     })
@@ -375,13 +379,18 @@
                 let htmlContent = "";
                 let hasIncomingNewPrivate = false;
                 let shouldPlaySound = false;
+                let avatarsUpdated = false;
 
                 messages.forEach(m => {
                     const isOwn = m.user === currentName;
                     const isNew = !knownMessageIds.has(m.id);
 
+                    // Η ΠΑΤΕΝΤΑ: Αν ένα μήνυμα έχει φώτο, τη μαθαίνουμε για τη λίστα δεξιά!
                     if (m.avatar && m.user !== currentName) {
-                        globalUsersAvatars[m.user] = m.avatar; 
+                        if (globalUsersAvatars[m.user] !== m.avatar) {
+                            globalUsersAvatars[m.user] = m.avatar;
+                            avatarsUpdated = true;
+                        }
                     }
 
                     if (isNew) {
@@ -401,7 +410,8 @@
                     }
                 });
 
-                if (hasIncomingNewPrivate) {
+                // Αν βρήκαμε καινούργιες φωτογραφίες, ανανεώνουμε τη λίστα δεξιά αμέσως
+                if (hasIncomingNewPrivate || avatarsUpdated) {
                     fetchPresence(); 
                 }
 
@@ -411,6 +421,9 @@
                 });
 
                 visibleMessages.forEach(data => {
+                    // Παράβλεψη των κενών ping μηνυμάτων συγχρονισμού στην οθόνη
+                    if (data.text === "" && !data.image) return;
+
                     const isOwn = data.user === currentName;
                     const isPrivate = !!data.to;
                     
