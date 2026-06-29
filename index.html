@@ -484,6 +484,7 @@
             location.reload();
         };
 
+        // 🔥 ΕΔΩ ΕΙΝΑΙ Ο ΗΧΟΣ ΠΟΥ ΦΤΙΑΧΤΗΚΕ ΓΙΑ ΝΑ ΠΑΙΖΕΙ ΟΤΑΝ ΚΟΥΝΑΣ ΤΗ ΜΠΑΡΑ!
         const volumeControl = document.getElementById("volume-control");
         const volumeIcon = document.getElementById("volume-icon");
         volumeControl.addEventListener("input", (e) => {
@@ -492,6 +493,10 @@
             if (val === 0) volumeIcon.textContent = "🔇";
             else if (val < 0.4) volumeIcon.textContent = "🔈";
             else volumeIcon.textContent = "🔊";
+            
+            // Παίζει το δείγμα ήχου για να ακούς πού βρίσκεται η ένταση
+            notificationSound.currentTime = 0;
+            notificationSound.play().catch(err => {});
         });
 
         const emojis = ["😀","😂","😍","🥰","😎","🔥","❤️","👍","👎","🎉","🚀","💯","🙌","😢","😱"];
