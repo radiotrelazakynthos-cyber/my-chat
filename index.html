@@ -113,45 +113,53 @@
             <button id="send-btn">📤 Αποστολή</button>
             <button id="emoji-btn">😀</button>
             <button id="image-btn">🖼️</button>
-            <input type="file" id="image-upload" accept="image/*" style="display:none;">
-            <button onclick="localStorage.clear(); location.reload();">🚪 Έξοδος</button>
+            <input type="file" id="image-upload" accept="image/*,image/gif" style="display:none;">
+            <button id="exit-btn">🚪 Έξοδος</button>
             <button id="toggle-theme">🌙</button>
         </div>
     </div>
 
     <div id="emoji-picker"></div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, limit, doc, setDoc, deleteDoc, where } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyATL9Y_6Vn-IVK-TBHvPQxcjMu_kduCbcc",
-            authDomain: "chat-sinefa.firebaseapp.com",
-            projectId: "chat-sinefa",
-            storageBucket: "chat-sinefa.firebasestorage.app",
-            messagingSenderId: "142067892049",
-            appId: "1:142067892049:web:8bc03520d3d1c78d451d70"
-        };
-        
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
+    <script>
         let currentName = localStorage.getItem("chatUser");
         let isLoggedIn = !!currentName && !currentName.startsWith("Guest_");
 
-        // Ορισμός του αρχείου ήχου ειδοποίησης
         const notificationSound = new Audio('ping.mp3');
-        let initialLoad = true; // Μεταβλητή για να μην χτυπάει ο ήχος στα παλιά μηνύματα κατά την είσοδο
+        let initialLoad = true;
+        let lastKnownMsgId = null;
 
-        // Ενημερώνουμε το Firebase ότι είμαστε online κάθε 5 δευτερόλεπτα
+        // Ενημέρωση παρουσίας (Online Status) στον δικό μας server
         async function updatePresence() {
             if (!isLoggedIn) return;
-            try { await setDoc(doc(db, "online", currentName), { lastSeen: Date.now() }); } catch(e) {}
+            try {
+                await fetch('/api/presence', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user: currentName })
+                });
+            } catch(e) {}
         }
+
+        // Λήψη λίστας online χρηστών
+        async function fetchPresence() {
+            if (!isLoggedIn) return;
+            try {
+                const res = await fetch('/api/presence');
+                const users = await res.json();
+                const box = document.getElementById("users-box");
+                box.innerHTML = "";
+                users.forEach(u => {
+                    box.innerHTML += `<div style="margin:3px 0; padding:4px;">👤 ${u}</div>`;
+                });
+            } catch(e) {}
+        }
+
         if (isLoggedIn) {
             updatePresence();
             setInterval(updatePresence, 5000);
+            fetchPresence();
+            setInterval(fetchPresence, 4000);
         }
 
         document.getElementById("enter-btn").onclick = async () => {
@@ -160,9 +168,7 @@
             const welcomeDiv = document.getElementById("welcome-overlay");
             welcomeDiv.innerHTML = `Καλώς ήρθες, <strong>${newName}</strong>! 🎉<br>Φόρτωση...`;
             welcomeDiv.style.display = "flex";
-            if (currentName && currentName.startsWith("Guest_")) {
-                try { await deleteDoc(doc(db, "online", currentName)); } catch(e){}
-            }
+            
             localStorage.setItem("chatUser", newName);
             setTimeout(() => location.reload(), 1200);
         };
@@ -175,10 +181,16 @@
             currentName = "Guest_" + Math.floor(Math.random() * 1000);
         }
 
+        // Αποστολή μηνύματος ή εικόνας στον server
         async function sendMessage(text, imageUrl = null) {
             if (!isLoggedIn || (!text && !imageUrl)) return;
             try {
-                await addDoc(collection(db, "chat"), { user: currentName, text: text || "", image: imageUrl, timestamp: Date.now() });
+                await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user: currentName, text: text || "", image: imageUrl })
+                });
+                fetchMessages(); // Ανανέωση αμέσως μετά την αποστολή
             } catch(e) {}
         }
 
@@ -192,50 +204,65 @@
             if (e.key === "Enter") document.getElementById("send-btn").click();
         });
 
+        // Συγχρονισμός μηνυμάτων σε πραγματικό χρόνο χωρίς Firebase
         const chatBox = document.getElementById("chat-box");
-        if (isLoggedIn) {
-            onSnapshot(query(collection(db, "chat"), orderBy("timestamp", "desc"), limit(50)), (snapshot) => {
-                let hasNewMessage = false;
+        async function fetchMessages() {
+            if (!isLoggedIn) return;
+            try {
+                const res = await fetch('/api/messages');
+                const messages = await res.json();
+                
+                let htmlContent = "";
+                let newestMsgId = null;
+                let incomingMessageFound = false;
 
-                chatBox.innerHTML = "";
-                snapshot.docs.reverse().forEach(d => {
-                    const data = d.data();
+                messages.forEach(data => {
                     const isOwn = data.user === currentName;
-                    const msgDiv = document.createElement("div");
-                    msgDiv.className = `message ${isOwn ? 'own' : ''}`;
-                    let html = `<strong>${data.user}:</strong> `;
-                    if (data.text) html += data.text;
-                    if (data.image) html += `<br><img src="${data.image}" style="max-width:280px; border-radius:8px; margin-top:6px;">`;
-                    msgDiv.innerHTML = html;
-                    chatBox.appendChild(msgDiv);
-
-                    // Αν το μήνυμα είναι από άλλον χρήστη, σημειώνουμε ότι βρέθηκε νέο μήνυμα
+                    htmlContent += `<div class="message ${isOwn ? 'own' : ''}"><strong>${data.user}:</strong> `;
+                    if (data.text) htmlContent += data.text;
+                    if (data.image) htmlContent += `<br><img src="${data.image}" style="max-width:280px; border-radius:8px; margin-top:6px;">`;
+                    htmlContent += `</div>`;
+                    
+                    newestMsgId = data.id;
                     if (!isOwn) {
-                        hasNewMessage = true;
+                        incomingMessageFound = true;
                     }
                 });
+
+                chatBox.innerHTML = htmlContent;
                 chatBox.scrollTop = chatBox.scrollHeight;
 
-                // Παίζει τον ήχο μόνο αν ΔΕΝ είναι η πρώτη φόρτωση της σελίδας και αν το μήνυμα είναι άλλου
-                if (!initialLoad && hasNewMessage) {
-                    notificationSound.play().catch(e => console.log("Sound play blocked until user interaction."));
+                // Έλεγχος για αναπαραγωγή ήχου ειδοποίησης
+                if (!initialLoad && newestMsgId !== lastKnownMsgId && incomingMessageFound) {
+                    notificationSound.play().catch(e => console.log("Sound played after interaction."));
+                }
+                
+                if(newestMsgId) {
+                    lastKnownMsgId = newestMsgId;
                 }
                 initialLoad = false;
-            });
+            } catch(e) {}
         }
 
-        // ΔΙΟΡΘΩΣΗ: Αυξήσαμε το όριο στα 2 λεπτά (120000ms) για να μην πετάει κανέναν έξω λόγω καθυστέρησης
         if (isLoggedIn) {
-            setInterval(() => {
-                const cutoff = Date.now() - 120000; 
-                onSnapshot(query(collection(db, "online"), where("lastSeen", ">", cutoff)), (snapshot) => {
-                    const box = document.getElementById("users-box");
-                    box.innerHTML = "";
-                    snapshot.forEach(d => box.innerHTML += `<div style="margin:3px 0; padding:4px;">👤 ${d.id}</div>`);
-                });
-            }, 4000);
+            fetchMessages();
+            setInterval(fetchMessages, 2000); // Έλεγχος για νέα μηνύματα κάθε 2 δευτερόλεπτα
         }
 
+        // Έξοδος από το Chat
+        document.getElementById("exit-btn").onclick = async () => {
+            try {
+                await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user: currentName })
+                });
+            } catch(e) {}
+            localStorage.clear();
+            location.reload();
+        };
+
+        // Emojis
         const emojis = ["😀","😂","😍","🥰","😎","🔥","❤️","👍","👎","🎉","🚀","💯","🙌","😢","😱"];
         const picker = document.getElementById("emoji-picker");
         emojis.forEach(emo => {
@@ -255,6 +282,7 @@
         };
         document.addEventListener("click", () => picker.style.display = "none");
 
+        // Ανέβασμα Εικόνων & GIF
         document.getElementById("image-btn").onclick = () => document.getElementById("image-upload").click();
         document.getElementById("image-upload").onchange = (e) => {
             const file = e.target.files[0];
@@ -264,6 +292,7 @@
             reader.readAsDataURL(file);
         };
 
+        // Dark/Light Theme
         let isDark = true;
         document.getElementById("toggle-theme").onclick = () => {
             isDark = !isDark;
