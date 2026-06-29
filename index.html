@@ -142,7 +142,6 @@
         .emoji { font-size: 24px; cursor: pointer; padding: 4px; }
         .emoji:hover { background: #00ff00; color: #000; border-radius: 4px; }
         .back-btn { background: #ff3333; color: white; padding: 4px 10px; height: auto; font-size: 13px; }
-        #upload-status { color: #ff0; font-size: 12px; margin-left: 5px; font-weight: bold; }
     </style>
     <style>
         body {
@@ -183,8 +182,10 @@
             <input type="text" id="msg-input" placeholder="Γράψε μήνυμα...">
             <button id="send-btn">📤 Αποστολή</button>
             <button id="emoji-btn">😀</button>
+            
+            
+
             <button id="image-btn">🖼️</button>
-            <div id="upload-status" style="display:none;">⏳ Ανέβασμα...</div>
             <input type="file" id="image-upload" accept="image/*,image/gif" style="display:none;">
             <button id="toggle-theme">🌙</button>
 			<div class="volume-container">
@@ -267,6 +268,7 @@
 
                     if (name !== currentName) {
                         const badge = unreadFromUsers.has(name) ? ` <span class="unread-badge">Νέο!</span>` : '';
+                        // Το κουμπί εμφανίζεται αν είσαι admin
                         let banBtnHtml = isAdmin ? `<button class="ban-btn" onclick="executeBan(event, '${name}')">🚫</button>` : '';
                         box.innerHTML += `<div class="user-row" onclick="startPrivateChat('${name}')">${imgTag} <span>${name}</span>${badge}${banBtnHtml}</div>`;
                     } else {
@@ -521,19 +523,8 @@
         document.getElementById("image-upload").onchange = (e) => {
             const file = e.target.files[0];
             if (!file || !isLoggedIn) return;
-
-            // Εμφάνιση loading
-            const statusDiv = document.getElementById("upload-status");
-            statusDiv.style.display = "block";
-            document.getElementById("image-btn").disabled = true;
-
             const reader = new FileReader();
-            reader.onload = async (ev) => {
-                await sendMessage("", ev.target.result);
-                // Κρύψιμο loading μόλις τελειώσει
-                statusDiv.style.display = "none";
-                document.getElementById("image-btn").disabled = false;
-            };
+            reader.onload = (ev) => sendMessage("", ev.target.result);
             reader.readAsDataURL(file);
         };
 
