@@ -140,13 +140,14 @@
         let currentName = localStorage.getItem("chatUser");
         let isLoggedIn = !!currentName && !currentName.startsWith("Guest_");
 
+        // Ενημερώνουμε το Firebase ότι είμαστε online κάθε 5 δευτερόλεπτα
         async function updatePresence() {
             if (!isLoggedIn) return;
             try { await setDoc(doc(db, "online", currentName), { lastSeen: Date.now() }); } catch(e) {}
         }
         if (isLoggedIn) {
             updatePresence();
-            setInterval(updatePresence, 8000);
+            setInterval(updatePresence, 5000);
         }
 
         document.getElementById("enter-btn").onclick = async () => {
@@ -206,15 +207,16 @@
             });
         }
 
+        // ΔΙΟΡΘΩΣΗ: Αυξήσαμε το όριο στα 2 λεπτά (120000ms) για να μην πετάει κανέναν έξω λόγω καθυστέρησης
         if (isLoggedIn) {
             setInterval(() => {
-                const cutoff = Date.now() - 25000;
+                const cutoff = Date.now() - 120000; 
                 onSnapshot(query(collection(db, "online"), where("lastSeen", ">", cutoff)), (snapshot) => {
                     const box = document.getElementById("users-box");
                     box.innerHTML = "";
                     snapshot.forEach(d => box.innerHTML += `<div style="margin:3px 0; padding:4px;">👤 ${d.id}</div>`);
                 });
-            }, 7000);
+            }, 4000);
         }
 
         const emojis = ["😀","😂","😍","🥰","😎","🔥","❤️","👍","👎","🎉","🚀","💯","🙌","😢","😱"];
