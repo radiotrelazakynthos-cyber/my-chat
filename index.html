@@ -62,7 +62,6 @@
             border-style: solid; background: rgba(0,100,0,0.3); color: #fff;
         }
 
-        /* Κουμπί BAN στυλ */
         .ban-btn {
             background: #ff3333; color: white; border: none; border-radius: 4px;
             padding: 2px 6px; font-size: 11px; cursor: pointer; font-weight: bold;
@@ -84,8 +83,8 @@
 
         #chat-cover {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0, 0, 0, 0.95); display: flex; align-items: center; 
-            justify-content: center; text-align: center; z-index: 100; border-radius: 15px;
+            background: #000000; display: flex; align-items: center; 
+            justify-content: center; text-align: center; z-index: 1000; border-radius: 15px;
             color: #00ff00; font-size: 18px;
         }
         #welcome-overlay {
@@ -199,7 +198,6 @@
     <div id="emoji-picker"></div>
 
     <script>
-        // 🔐 Δημιουργία Μοναδικού Token Συσκευής για το Ban αν δεν υπάρχει
         let deviceToken = localStorage.getItem("chatDeviceToken");
         if (!deviceToken) {
             deviceToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -269,10 +267,7 @@
 
                     if (name !== currentName) {
                         const badge = unreadFromUsers.has(name) ? ` <span class="unread-badge">Νέο!</span>` : '';
-                        
-                        // Αν είσαι Admin, εμφανίζεται το κουμπί BAN (🚫)
                         let banBtnHtml = isAdmin ? `<button class="ban-btn" style="display:inline-block;" onclick="executeBan(event, '${name}')">🚫</button>` : '';
-                        
                         box.innerHTML += `<div class="user-row" onclick="startPrivateChat('${name}')">${imgTag} <span>${name}</span>${badge}${banBtnHtml}</div>`;
                     } else {
                         let myImg = currentAvatar ? `<img src="${currentAvatar}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">📷</div>`;
@@ -282,9 +277,8 @@
             } catch(e) {}
         }
 
-        // Λειτουργία BAN από τον Admin
         async function executeBan(event, username) {
-            event.stopPropagation(); // Σταματάει το άνοιγμα του πριβέ chat
+            event.stopPropagation();
             if (!confirm(`Θέλεις σίγουρα να αποκλείσεις (BAN) οριστικά τον χρήστη ${username};`)) return;
 
             try {
@@ -350,6 +344,8 @@
                 
                 if (!data.success) {
                     if (data.error === 'banned') handleBannedUser();
+                    document.getElementById("username").value = "";
+                    document.getElementById("username").placeholder = "Το όνομά σου...";
                     return;
                 }
 
@@ -357,7 +353,7 @@
                 localStorage.setItem("chatIsAdmin", data.isAdmin ? "true" : "false");
 
                 const welcomeDiv = document.getElementById("welcome-overlay");
-                welcomeDiv.innerHTML = data.isAdmin ? `Καλώς όρισες Αρχηγέ <strong>${data.username}</strong>! 👑<br>Φόρτωση...` : `Καλώς ήρθες, <strong>${data.username}</strong>! 🎉<br>Φόρτωση...`;
+                welcomeDiv.innerHTML = data.isAdmin ? `Καλώς ορισες Αρχηγέ <strong>${data.username}</strong>! 👑<br>Φόρτωση...` : `Καλώς ήρθες, <strong>${data.username}</strong>! 🎉<br>Φόρτωση...`;
                 welcomeDiv.style.display = "flex";
                 
                 setTimeout(() => location.reload(), 1200);
@@ -368,6 +364,9 @@
             document.getElementById("login-screen").style.display = "none";
             document.getElementById("chat-controls").style.display = "flex";
             document.getElementById("chat-cover").style.display = "none";
+        } else {
+            currentName = "Guest_" + Math.floor(Math.random() * 1000);
+            document.getElementById("username").placeholder = "Το όνομά σου...";
         }
 
         async function sendMessage(text, imageUrl = null) {
@@ -485,7 +484,6 @@
             location.reload();
         };
 
-        // Volume Controls
         const volumeControl = document.getElementById("volume-control");
         const volumeIcon = document.getElementById("volume-icon");
         volumeControl.addEventListener("input", (e) => {
@@ -496,7 +494,6 @@
             else volumeIcon.textContent = "🔊";
         });
 
-        // Emojis
         const emojis = ["😀","😂","😍","🥰","😎","🔥","❤️","👍","👎","🎉","🚀","💯","🙌","😢","😱"];
         const picker = document.getElementById("emoji-picker");
         emojis.forEach(emo => {
@@ -515,7 +512,6 @@
         };
         document.addEventListener("click", () => picker.style.display = "none");
 
-        // Images
         document.getElementById("image-btn").onclick = () => document.getElementById("image-upload").click();
         document.getElementById("image-upload").onchange = (e) => {
             const file = e.target.files[0];
@@ -525,7 +521,6 @@
             reader.readAsDataURL(file);
         };
 
-        // Theme Toggle
         let isDark = true;
         document.getElementById("toggle-theme").onclick = () => {
             isDark = !isDark;
