@@ -131,13 +131,17 @@
         const chatBox = document.getElementById("chat-box");
         const usersBox = document.getElementById("users-box");
 
+        // ΑΥΤΟ ΔΙΟΡΘΩΘΗΚΕ: Μόλις συνδεθεί το socket, αν είμαστε ήδη συνδεδεμένοι, στέλνει ΑΜΕΣΩΣ το όνομα στον server
+        socket.on('connect', () => {
+            if (isLoggedIn && currentName) {
+                socket.emit('register-user', currentName);
+            }
+        });
+
         if (isLoggedIn) {
             document.getElementById("login-screen").style.display = "none";
             document.getElementById("chat-controls").style.display = "flex";
             document.getElementById("chat-cover").style.display = "none";
-            
-            // Δηλώνουμε το όνομά μας στον server
-            socket.emit('register-user', currentName);
         }
 
         document.getElementById("enter-btn").onclick = () => {
@@ -149,6 +153,8 @@
             welcomeDiv.style.display = "flex";
             
             localStorage.setItem("chatUser", newName);
+            // Στέλνουμε το όνομα πριν το reload
+            socket.emit('register-user', newName);
             setTimeout(() => location.reload(), 1200);
         };
 
@@ -164,20 +170,17 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        // Λήψη ιστορικού κατά την είσοδο
         socket.on('chat-history', (history) => {
             chatBox.innerHTML = "";
             history.forEach(msg => renderMessage(msg));
         });
 
-        // Λήψη νέου μηνύματος
         socket.on('new-message', (msg) => {
             if (isLoggedIn) {
                 renderMessage(msg);
             }
         });
 
-        // Ενημέρωση λίστας online χρηστών
         socket.on('update-users', (usersList) => {
             if (isLoggedIn) {
                 usersBox.innerHTML = "";
@@ -202,7 +205,6 @@
             if (e.key === "Enter") document.getElementById("send-btn").click();
         });
 
-        // Emoji Picker Logic
         const emojis = ["😀","😂","😍","🥰","😎","🔥","❤️","👍","👎","🎉","🚀","💯","🙌","😢","😱"];
         const picker = document.getElementById("emoji-picker");
         emojis.forEach(emo => {
@@ -222,7 +224,6 @@
         };
         document.addEventListener("click", () => picker.style.display = "none");
 
-        // Image Upload Logic
         document.getElementById("image-btn").onclick = () => document.getElementById("image-upload").click();
         document.getElementById("image-upload").onchange = (e) => {
             const file = e.target.files[0];
