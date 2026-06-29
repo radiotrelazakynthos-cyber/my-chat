@@ -52,6 +52,18 @@
         .user-row:hover {
             background: #00ff00; color: #000;
         }
+        
+        /* Ειδικό στυλ για τη σειρά "Εσύ" ώστε να φαίνεται ότι πατιέται */
+        .my-row {
+            margin: 5px 0; padding: 6px; border: 1px dashed #00ff00; 
+            border-radius: 5px; cursor: pointer; background: rgba(0,20,0,0.2);
+            display: flex; align-items: center; gap: 8px; color: #888; font-weight: bold;
+            transition: 0.2s;
+        }
+        .my-row:hover {
+            border-style: solid; background: rgba(0,100,0,0.3); color: #fff;
+        }
+
         .unread-badge {
             background: #ff3333; color: white; font-size: 11px; padding: 2px 5px;
             border-radius: 4px; display: inline-block; position: absolute; right: 5px;
@@ -64,15 +76,7 @@
         /* Στυλ για τα Avatars */
         .avatar {
             width: 30px; height: 30px; border-radius: 50%; border: 1px solid #00ff00;
-            object-fit: cover; background: #222; shrink: 0;
-        }
-        .avatar-preview-btn {
-            width: 50px; height: 50px; border-radius: 50%; border: 2px dashed #00ff00;
-            display: flex; align-items: center; justify-content: center; color: #00ff00;
-            cursor: pointer; overflow: hidden; background: #111; font-size: 11px; font-weight: bold;
-        }
-        .avatar-preview-btn img {
-            width: 100%; height: 100%; object-fit: cover;
+            object-fit: cover; background: #222; flex-shrink: 0;
         }
 
         #chat-cover {
@@ -171,13 +175,12 @@
         </div>
          
         <div id="login-screen">
-            <div id="avatar-select-btn" class="avatar-preview-btn">➕ Φώτο</div>
-            <input type="file" id="avatar-input" accept="image/*" style="display: none;">
-            
             <input type="text" id="username" placeholder="Το όνομά σου..." maxlength="20">
             <button id="enter-btn">Είσοδος</button>
         </div>
          
+        <input type="file" id="my-avatar-input" accept="image/*" style="display: none;">
+
         <div id="chat-controls" style="display:none;">
             <input type="text" id="msg-input" placeholder="Γράψε μήνυμα...">
             <button id="send-btn">📤 Αποστολή</button>
@@ -199,7 +202,7 @@
 
     <script>
         let currentName = localStorage.getItem("chatUser");
-        let currentAvatar = localStorage.getItem("chatAvatar") || ""; // Φόρτωση αποθηκευμένου avatar
+        let currentAvatar = localStorage.getItem("chatAvatar") || ""; 
         let isLoggedIn = !!currentName && !currentName.startsWith("Guest_");
         let activePrivateTarget = null; 
 
@@ -209,29 +212,27 @@
         let initialLoad = true;
         let unreadFromUsers = new Set(); 
         let knownMessageIds = new Set();
-        let globalUsersAvatars = {}; // Κρατάει στη μνήμη τα είδωλα των άλλων χρηστών
+        let globalUsersAvatars = {}; 
 
-        // Διαχείριση Ανεβάσματος Avatar στο Login
-        const avatarSelectBtn = document.getElementById("avatar-select-btn");
-        const avatarInput = document.getElementById("avatar-input");
-        
-        // Αν υπάρχει ήδη αποθηκευμένο avatar, το δείχνει στην οθόνη εισόδου
-        if(currentAvatar && avatarSelectBtn) {
-            avatarSelectBtn.innerHTML = `<img src="${currentAvatar}">`;
-        }
-
-        avatarSelectBtn.onclick = () => avatarInput.click();
-        avatarInput.onchange = (e) => {
+        // Λειτουργία για το κρυφό input του Avatar
+        const myAvatarInput = document.getElementById("my-avatar-input");
+        myAvatarInput.onchange = (e) => {
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
             reader.onload = (ev) => {
                 currentAvatar = ev.target.result;
-                avatarSelectBtn.innerHTML = `<img src="${currentAvatar}">`;
                 localStorage.setItem("chatAvatar", currentAvatar);
+                updatePresence(); // Στέλνει αμέσως τη νέα φώτο στον server
+                fetchPresence();  // Ανανεώνει τη λίστα για να τη δεις αμέσως
             };
             reader.readAsDataURL(file);
         };
+
+        // Συνάρτηση που καλείται όταν κάνεις κλικ στο όνομά σου
+        function triggerAvatarUpload() {
+            myAvatarInput.click();
+        }
 
         const volumeControl = document.getElementById("volume-control");
         const volumeIcon = document.getElementById("volume-icon");
@@ -253,7 +254,7 @@
                 await fetch('/api/presence', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user: currentName, avatar: currentAvatar }) // Στέλνει και το avatar
+                    body: JSON.stringify({ user: currentName, avatar: currentAvatar })
                 });
             } catch(e) {}
         }
@@ -263,8 +264,6 @@
             try {
                 const res = await fetch('/api/presence');
                 const usersData = await res.json(); 
-                
-                // Υποστήριξη αν ο server επιστρέφει απλό πίνακα ή πίνακα με αντικείμενα {user, avatar}
                 const box = document.getElementById("users-box");
                 box.innerHTML = "";
                 
@@ -273,7 +272,7 @@
                     let av = typeof u === 'object' ? (u.avatar || "") : "";
                     
                     if(name !== currentName && av) {
-                        globalUsersAvatars[name] = av; // Αποθήκευση στη μνήμη
+                        globalUsersAvatars[name] = av;
                     }
 
                     let imgTag = av ? `<img src="${av}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
@@ -282,8 +281,9 @@
                         const badge = unreadFromUsers.has(name) ? ` <span class="unread-badge">Νέο!</span>` : '';
                         box.innerHTML += `<div class="user-row" onclick="startPrivateChat('${name}')">${imgTag} <span>${name}</span>${badge}</div>`;
                     } else {
-                        let myImg = currentAvatar ? `<img src="${currentAvatar}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
-                        box.innerHTML += `<div style="margin:5px 0; padding:6px; display:flex; align-items:center; gap:8px; color:#888; font-weight:bold;">${myImg} <span>${name} (Εσύ)</span></div>`;
+                        // Το δικό σου όνομα γίνεται κλικάσιμο (.my-row) για αλλαγή φωτογραφίας
+                        let myImg = currentAvatar ? `<img src="${currentAvatar}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">📷</div>`;
+                        box.innerHTML += `<div class="my-row" onclick="triggerAvatarUpload()" title="Κλικ για προσθήκη/αλλαγή φωτογραφίας">${myImg} <span>${name} (Εσύ)</span></div>`;
                     }
                 });
             } catch(e) {}
@@ -345,7 +345,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         user: currentName, 
-                        avatar: currentAvatar, // Στέλνει το avatar μαζί με το μήνυμα
+                        avatar: currentAvatar, 
                         text: text || "", 
                         image: imageUrl,
                         to: activePrivateTarget 
@@ -381,7 +381,7 @@
                     const isNew = !knownMessageIds.has(m.id);
 
                     if (m.avatar && m.user !== currentName) {
-                        globalUsersAvatars[m.user] = m.avatar; // Κρατάμε στη μνήμη το avatar από το μήνυμα
+                        globalUsersAvatars[m.user] = m.avatar; 
                     }
 
                     if (isNew) {
@@ -414,7 +414,6 @@
                     const isOwn = data.user === currentName;
                     const isPrivate = !!data.to;
                     
-                    // Επιλογή σωστού avatar για το μήνυμα
                     let userAv = isOwn ? currentAvatar : (data.avatar || globalUsersAvatars[data.user] || "");
                     let msgAvatarTag = userAv ? `<img src="${userAv}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
 
