@@ -6,61 +6,80 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    maxHttpBufferSize: 1e7 // Επιτρέπει ανέβασμα εικόνων έως 10MB
+    maxHttpBufferSize: 1e7
 });
 
 const PORT = process.env.PORT || 3000;
+const ADMIN_PASSWORD = "1234"; 
 
-// Σερβίρισμα των στατικών αρχείων (HTML, εικόνες κλπ)
 app.use(express.static(__dirname));
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Αποθήκευση των ενεργών χρηστών στη μνήμη του server
+// Κρατάμε τους χρήστες και τα timeouts για τα refresh τους
 let activeUsers = new Set();
-// Κρατάμε τα τελευταία 50 μηνύματα στη μνήμη για να τα βλέπει όποιος μπαίνει
+let disconnectTimeouts = {};
 let messageHistory = [];
 
 io.on('connection', (socket) => {
     let myUsername = null;
 
-    // Στέλνουμε το ιστορικό των μηνυμάτων στον νέο χρήστη
     socket.emit('chat-history', messageHistory);
 
-    // Όταν ένας χρήστης κάνει είσοδο
     socket.on('register-user', (username) => {
         myUsername = username;
+        
+        // Αν υπήρχε timeout διαγραφής για αυτόν τον χρήστη (λόγω refresh), το ακυρώνουμε
+        if (disconnectTimeouts[username]) {
+            clearTimeout(disconnectTimeouts[username]);
+            delete disconnectTimeouts[username];
+        }
+        
         activeUsers.add(username);
-        // Ενημέρωση όλων για τη νέα λίστα χρηστών
         io.emit('update-users', Array.from(activeUsers));
     });
 
-    // Όταν έρχεται ένα νέο μήνυμα (κείμενο ή εικόνα)
     socket.on('send-message', (data) => {
         if (!myUsername) return;
 
         const msgObject = {
+            id: Date.now() + Math.random().toString(36).substr(2, 5),
             user: myUsername,
             text: data.text || "",
             image: data.image || null,
             timestamp: Date.now()
         };
 
-        // Προσθήκη στο ιστορικό
         messageHistory.push(msgObject);
         if (messageHistory.length > 50) messageHistory.shift();
 
-        // Εκπομπή του μηνύματος σε όλους
         io.emit('new-message', msgObject);
     });
 
-    // Όταν αποσυνδέεται ένας χρήστης
+    socket.on('admin-delete-message', (data) => {
+        if (data.password === ADMIN_PASSWORD) {
+            messageHistory = messageHistory.filter(msg => msg.id !== data.msgId);
+            io.emit('chat-history', messageHistory);
+        }
+    });
+
+    socket.on('admin-clear-chat', (data) => {
+        if (data.password === ADMIN_PASSWORD) {
+            messageHistory = [];
+            io.emit('chat-history', messageHistory);
+        }
+    });
+
     socket.on('disconnect', () => {
         if (myUsername) {
-            activeUsers.delete(myUsername);
-            io.emit('update-users', Array.from(activeUsers));
+            // Αντί να τον σβήσουμε αμέσως, περιμένουμε 5 δευτερόλεπτα μήπως έκανε refresh
+            disconnectTimeouts[myUsername] = setTimeout(() => {
+                activeUsers.delete(myUsername);
+                io.emit('update-users', Array.from(activeUsers));
+                delete disconnectTimeouts[myUsername];
+            }, 5000); 
         }
     });
 });
