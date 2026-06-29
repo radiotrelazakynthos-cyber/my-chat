@@ -309,6 +309,8 @@
             document.getElementById("chat-wrapper").style.borderColor = "#ff00ff";
             document.getElementById("back-to-global").style.display = "inline-block";
             initialLoad = true;
+            chatBox.innerHTML = ""; // Καθαρισμός για αλλαγή δωματίου
+            knownMessageIds.clear(); // Επαναφορά για να φορτωθεί σωστά το πριβέ
             fetchMessages();
         }
 
@@ -319,6 +321,8 @@
             document.getElementById("chat-wrapper").style.borderColor = "#00ff00";
             document.getElementById("back-to-global").style.display = "none";
             initialLoad = true;
+            chatBox.innerHTML = "";
+            knownMessageIds.clear();
             fetchMessages();
         };
 
@@ -407,34 +411,8 @@
                 if (res.status === 403) handleBannedUser();
                 
                 const messages = await res.json();
-                let htmlContent = "";
-                let hasIncomingNewPrivate = false;
                 let shouldPlaySound = false;
-
-                messages.forEach(m => {
-                    const isOwn = m.user === currentName;
-                    const isNew = !knownMessageIds.has(m.id);
-
-                    if (m.avatar && m.user !== currentName) {
-                        globalUsersAvatars[m.user] = m.avatar; 
-                    }
-
-                    if (isNew) {
-                        knownMessageIds.add(m.id);
-                        if (!isOwn && !initialLoad) {
-                            if (!m.to && activePrivateTarget === null) shouldPlaySound = true;
-                            else if (m.to === currentName) shouldPlaySound = true;
-                        }
-                        if (m.to === currentName && m.user !== activePrivateTarget) {
-                            if (!unreadFromUsers.has(m.user)) {
-                                unreadFromUsers.add(m.user);
-                                hasIncomingNewPrivate = true;
-                            }
-                        }
-                    }
-                });
-
-                if (hasIncomingNewPrivate) fetchPresence(); 
+                let hasIncomingNewPrivate = false;
 
                 const visibleMessages = messages.filter(m => {
                     if (activePrivateTarget === null) return !m.to; 
@@ -442,25 +420,43 @@
                 });
 
                 visibleMessages.forEach(data => {
-                    const isOwn = data.user === currentName;
-                    const isPrivate = !!data.to;
-                    
-                    let userAv = isOwn ? currentAvatar : (data.avatar || globalUsersAvatars[data.user] || "");
-                    let msgAvatarTag = userAv ? `<img src="${userAv}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
+                    if (!knownMessageIds.has(data.id)) {
+                        knownMessageIds.add(data.id);
+                        
+                        const isOwn = data.user === currentName;
+                        if (!initialLoad) {
+                            if (!isOwn) {
+                                if (!data.to && activePrivateTarget === null) shouldPlaySound = true;
+                                else if (data.to === currentName) shouldPlaySound = true;
+                            }
+                            if (data.to === currentName && data.user !== activePrivateTarget) {
+                                if (!unreadFromUsers.has(data.user)) {
+                                    unreadFromUsers.add(data.user);
+                                    hasIncomingNewPrivate = true;
+                                }
+                            }
+                        }
 
-                    htmlContent += `<div class="message ${isOwn ? 'own' : ''} ${isPrivate ? 'private-msg' : ''}">`;
-                    htmlContent += msgAvatarTag;
-                    htmlContent += `<div class="message-content">`;
-                    htmlContent += `<strong>${data.user}${isPrivate ? ' [Πριβέ]' : ''}:</strong> `;
-                    if (data.text) htmlContent += `<span>${data.text}</span>`;
-                    if (data.image) htmlContent += `<img src="${data.image}" style="max-width:280px; border-radius:8px; margin-top:6px;">`;
-                    htmlContent += `</div></div>`;
+                        const isPrivate = !!data.to;
+                        let userAv = data.user === currentName ? currentAvatar : (data.avatar || globalUsersAvatars[data.user] || "");
+                        let msgAvatarTag = userAv ? `<img src="${userAv}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
+
+                        let newMsgHtml = `<div class="message ${data.user === currentName ? 'own' : ''} ${isPrivate ? 'private-msg' : ''}">` +
+                                         msgAvatarTag +
+                                         `<div class="message-content">` +
+                                         `<strong>${data.user}${isPrivate ? ' [Πριβέ]' : ''}:</strong> ` +
+                                         (data.text ? `<span>${data.text}</span>` : "") +
+                                         (data.image ? `<img src="${data.image}" style="max-width:280px; border-radius:8px; margin-top:6px;">` : "") +
+                                         `</div></div>`;
+
+                        chatBox.insertAdjacentHTML('beforeend', newMsgHtml);
+                        
+                        const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight <= 30;
+                        if (isAtBottom) chatBox.scrollTop = chatBox.scrollHeight;
+                    }
                 });
 
-                const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight <= 30;
-                chatBox.innerHTML = htmlContent;
-
-                if (initialLoad || isAtBottom) chatBox.scrollTop = chatBox.scrollHeight;
+                if (hasIncomingNewPrivate) fetchPresence(); 
                 if (shouldPlaySound) notificationSound.play().catch(e => {});
                 
                 initialLoad = false;
@@ -484,7 +480,6 @@
             location.reload();
         };
 
-        // 🔥 ΕΔΩ ΕΙΝΑΙ Ο ΗΧΟΣ ΠΟΥ ΦΤΙΑΧΤΗΚΕ ΓΙΑ ΝΑ ΠΑΙΖΕΙ ΟΤΑΝ ΚΟΥΝΑΣ ΤΗ ΜΠΑΡΑ!
         const volumeControl = document.getElementById("volume-control");
         const volumeIcon = document.getElementById("volume-icon");
         volumeControl.addEventListener("input", (e) => {
@@ -493,8 +488,6 @@
             if (val === 0) volumeIcon.textContent = "🔇";
             else if (val < 0.4) volumeIcon.textContent = "🔈";
             else volumeIcon.textContent = "🔊";
-            
-            // Παίζει το δείγμα ήχου για να ακούς πού βρίσκεται η ένταση
             notificationSound.currentTime = 0;
             notificationSound.play().catch(err => {});
         });
