@@ -168,7 +168,10 @@
         const notificationSound = new Audio('ping.mp3');
         let initialLoad = true;
         let lastKnownMsgId = null;
-        let unreadFromUsers = new Set(); // Κρατάει ποιοι μας έστειλαν πριβέ
+        let unreadFromUsers = new Set(); 
+        
+        // Έξυπνη μνήμη: Αποθηκεύει τα IDs των μηνυμάτων που έχουμε ήδη εμφανίσει/διαβάσει στην οθόνη
+        let readMessagesIds = new Set();
 
         async function updatePresence() {
             if (!isLoggedIn) return;
@@ -190,7 +193,6 @@
                 box.innerHTML = "";
                 users.forEach(u => {
                     if (u !== currentName) {
-                        // Αν έχουμε αδιάβαστο μήνυμα από αυτόν, δείξε κόκκινη ταμπέλα
                         const badge = unreadFromUsers.has(u) ? ` <span class="unread-badge">Νέο!</span>` : '';
                         box.innerHTML += `<div class="user-row" onclick="startPrivateChat('${u}')">👤 ${u}${badge}</div>`;
                     } else {
@@ -202,14 +204,13 @@
 
         function startPrivateChat(targetUser) {
             activePrivateTarget = targetUser;
-            unreadFromUsers.delete(targetUser); // Μόλις τον πατήσουμε, σβήνει η ειδοποίηση
+            unreadFromUsers.delete(targetUser); 
             document.getElementById("room-title").textContent = `Συνομιλία με: ${targetUser} [Πριβέ]`;
             document.getElementById("room-title").style.color = "#ff00ff";
             document.getElementById("chat-wrapper").style.borderColor = "#ff00ff";
             document.getElementById("back-to-global").style.display = "inline-block";
             initialLoad = true;
             fetchMessages();
-            fetchPresence(); // Ανανέωση λίστας για να φύγει το κόκκινο αμέσως
         }
 
         document.getElementById("back-to-global").onclick = () => {
@@ -288,21 +289,28 @@
                 let lastMessageUser = null;
                 let hasIncomingNewPrivate = false;
 
-                // 1. Έλεγχος για νέα πριβέ μηνύματα που δεν έχουμε ανοιχτά
+                // 1. Έλεγχος για πραγματικά ΝΕΑ πριβέ μηνύματα
                 messages.forEach(m => {
-                    if (m.to === currentName && m.user !== activePrivateTarget) {
-                        if (!unreadFromUsers.has(m.user)) {
-                            unreadFromUsers.add(m.user);
-                            hasIncomingNewPrivate = true;
+                    // Αν το μήνυμα είναι για μένα, από άλλον, και ΔΕΝ το έχουμε ξαναδεί/διαβάσει
+                    if (m.to === currentName && !readMessagesIds.has(m.id)) {
+                        if (m.user === activePrivateTarget) {
+                            // Αν έχουμε ήδη ανοιχτό το πριβέ με αυτόν, το μαρκάρουμε αμέσως διαβασμένο
+                            readMessagesIds.add(m.id);
+                        } else {
+                            // Αν είμαστε αλλού, ανάβει η ειδοποίηση
+                            if (!unreadFromUsers.has(m.user)) {
+                                unreadFromUsers.add(m.user);
+                                hasIncomingNewPrivate = true;
+                            }
                         }
                     }
                 });
 
                 if (hasIncomingNewPrivate) {
-                    fetchPresence(); // Ανανέωσε τη λίστα χρηστών για να δείξει το "Νέο!"
+                    fetchPresence(); 
                 }
 
-                // 2. Φιλτράρισμα για το τι θα δείξει το κεντρικό παράθυρο
+                // 2. Φιλτράρισμα για την κεντρική οθόνη
                 const visibleMessages = messages.filter(m => {
                     if (activePrivateTarget === null) {
                         return !m.to; 
@@ -315,6 +323,9 @@
                     const isOwn = data.user === currentName;
                     const isPrivate = !!data.to;
                     
+                    // Κάθε μήνυμα που εμφανίζεται στην οθόνη μας, θεωρείται πλέον "διαβασμένο"
+                    readMessagesIds.add(data.id);
+
                     htmlContent += `<div class="message ${isOwn ? 'own' : ''} ${isPrivate ? 'private-msg' : ''}">`;
                     htmlContent += `<strong>${data.user}${isPrivate ? ' [Πριβέ]' : ''}:</strong> `;
                     if (data.text) htmlContent += data.text;
@@ -332,7 +343,6 @@
                     chatBox.scrollTop = chatBox.scrollHeight;
                 }
 
-                // Παίζει ήχος αν ήρθε ΜΗΝΥΜΑ γενικά (ή πριβέ) που δεν είναι δικό μας
                 if (!initialLoad && newestMsgId !== lastKnownMsgId && lastMessageUser !== currentName) {
                     notificationSound.play().catch(e => console.log("Sound error"));
                 }
@@ -341,6 +351,9 @@
                     lastKnownMsgId = newestMsgId;
                 }
                 initialLoad = false;
+                
+                // Πάντα ανανεώνουμε τη λίστα παρουσίας για να σβήσει το badge σωστά
+                fetchPresence();
             } catch(e) {}
         }
 
