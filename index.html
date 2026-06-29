@@ -309,8 +309,8 @@
             document.getElementById("chat-wrapper").style.borderColor = "#ff00ff";
             document.getElementById("back-to-global").style.display = "inline-block";
             initialLoad = true;
-            chatBox.innerHTML = ""; // Καθαρισμός για αλλαγή δωματίου
-            knownMessageIds.clear(); // Επαναφορά για να φορτωθεί σωστά το πριβέ
+            chatBox.innerHTML = ""; 
+            knownMessageIds.clear(); 
             fetchMessages();
         }
 
@@ -441,7 +441,7 @@
                         let userAv = data.user === currentName ? currentAvatar : (data.avatar || globalUsersAvatars[data.user] || "");
                         let msgAvatarTag = userAv ? `<img src="${userAv}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
 
-                        let newMsgHtml = `<div class="message ${data.user === currentName ? 'own' : ''} ${isPrivate ? 'private-msg' : ''}">` +
+                        let newMsgHtml = `<div class="message ${isOwn ? 'own' : ''} ${isPrivate ? 'private-msg' : ''}">` +
                                          msgAvatarTag +
                                          `<div class="message-content">` +
                                          `<strong>${data.user}${isPrivate ? ' [Πριβέ]' : ''}:</strong> ` +
