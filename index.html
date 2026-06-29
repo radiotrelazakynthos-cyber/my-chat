@@ -140,6 +140,10 @@
         let currentName = localStorage.getItem("chatUser");
         let isLoggedIn = !!currentName && !currentName.startsWith("Guest_");
 
+        // Ορισμός του αρχείου ήχου ειδοποίησης
+        const notificationSound = new Audio('ping.mp3');
+        let initialLoad = true; // Μεταβλητή για να μην χτυπάει ο ήχος στα παλιά μηνύματα κατά την είσοδο
+
         // Ενημερώνουμε το Firebase ότι είμαστε online κάθε 5 δευτερόλεπτα
         async function updatePresence() {
             if (!isLoggedIn) return;
@@ -191,6 +195,8 @@
         const chatBox = document.getElementById("chat-box");
         if (isLoggedIn) {
             onSnapshot(query(collection(db, "chat"), orderBy("timestamp", "desc"), limit(50)), (snapshot) => {
+                let hasNewMessage = false;
+
                 chatBox.innerHTML = "";
                 snapshot.docs.reverse().forEach(d => {
                     const data = d.data();
@@ -202,8 +208,19 @@
                     if (data.image) html += `<br><img src="${data.image}" style="max-width:280px; border-radius:8px; margin-top:6px;">`;
                     msgDiv.innerHTML = html;
                     chatBox.appendChild(msgDiv);
+
+                    // Αν το μήνυμα είναι από άλλον χρήστη, σημειώνουμε ότι βρέθηκε νέο μήνυμα
+                    if (!isOwn) {
+                        hasNewMessage = true;
+                    }
                 });
                 chatBox.scrollTop = chatBox.scrollHeight;
+
+                // Παίζει τον ήχο μόνο αν ΔΕΝ είναι η πρώτη φόρτωση της σελίδας και αν το μήνυμα είναι άλλου
+                if (!initialLoad && hasNewMessage) {
+                    notificationSound.play().catch(e => console.log("Sound play blocked until user interaction."));
+                }
+                initialLoad = false;
             });
         }
 
