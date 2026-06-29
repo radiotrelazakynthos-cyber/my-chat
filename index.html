@@ -102,7 +102,7 @@
                 <p>Για να δεις τα μηνύματα και να συμμετάσχεις<br>βάλε το όνομά σου και κάνε Είσοδος!</p>
             </div>
         </div>
-        
+         
         <div id="login-screen">
             <input type="text" id="username" placeholder="Το όνομά σου..." maxlength="20">
             <button id="enter-btn">Είσοδος</button>
@@ -214,7 +214,7 @@
                 
                 let htmlContent = "";
                 let newestMsgId = null;
-                let incomingMessageFound = false;
+                let lastMessageUser = null;
 
                 messages.forEach(data => {
                     const isOwn = data.user === currentName;
@@ -224,16 +224,14 @@
                     htmlContent += `</div>`;
                     
                     newestMsgId = data.id;
-                    if (!isOwn) {
-                        incomingMessageFound = true;
-                    }
+                    lastMessageUser = data.user; // Κρατάμε ποιος έστειλε το τελευταίο μήνυμα στη λίστα
                 });
 
                 chatBox.innerHTML = htmlContent;
                 chatBox.scrollTop = chatBox.scrollHeight;
 
-                // Έλεγχος για αναπαραγωγή ήχου ειδοποίησης
-                if (!initialLoad && newestMsgId !== lastKnownMsgId && incomingMessageFound) {
+                // ΔΙΟΡΘΩΣΗ ΗΧΟΥ: Παίζει ΜΟΝΟ αν το μήνυμα είναι νέο ΚΑΙ ο αποστολέας ΔΕΝ είσαι εσύ
+                if (!initialLoad && newestMsgId !== lastKnownMsgId && lastMessageUser !== currentName) {
                     notificationSound.play().catch(e => console.log("Sound played after interaction."));
                 }
                 
