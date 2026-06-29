@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 10000;
 
@@ -11,9 +12,20 @@ app.use(express.static(__dirname));
 let messages = [];
 let onlineUsers = {}; 
 
-// Λίστα με τις μπλοκαρισμένες ταυτότητες (IPs και Device Tokens)
-let bannedIPs = new Set();
-let bannedTokens = new Set();
+// Αρχείο για μόνιμα Bans
+const BANS_FILE = path.join(__dirname, 'bans.json');
+let bannedData = { ips: [], tokens: [] };
+
+if (fs.existsSync(BANS_FILE)) {
+    bannedData = JSON.parse(fs.readFileSync(BANS_FILE));
+}
+
+let bannedIPs = new Set(bannedData.ips);
+let bannedTokens = new Set(bannedData.tokens);
+
+function saveBans() {
+    fs.writeFileSync(BANS_FILE, JSON.stringify({ ips: Array.from(bannedIPs), tokens: Array.from(bannedTokens) }));
+}
 
 // Ο ΜΥΣΤΙΚΟΣ ΣΟΥ ΚΩΔΙΚΟΣ
 const ADMIN_PASSWORD = "sakis019630";
@@ -47,7 +59,7 @@ app.post('/api/login', (req, res) => {
     let username = loginString.trim();
     let isAdmin = false;
 
-    // Έλεγχος αν έβαλε τον κωδικό διαχειριστή (sakis:sakis019630)
+    // Έλεγχος αν έβαλε τον κωδικό διαχειριστή
     if (username.includes(':')) {
         const parts = username.split(':');
         const namePart = parts[0].trim();
@@ -143,9 +155,8 @@ app.get('/api/presence', (req, res) => {
 
 // 🔥 ΤΟ ΚΟΥΜΠΙ ΤΟΥ BAN (Μόνο για τον Admin)
 app.post('/api/ban', (req, res) => {
-    const { targetUser, adminToken, adminName } = req.body;
+    const { targetUser, adminName } = req.body;
 
-    // Ασφάλεια: Έλεγχος αν αυτός που ζητάει το ban είναι όντως ο sakis
     if (adminName !== 'sakis') {
         return res.status(403).json({ error: 'Unauthorized' });
     }
@@ -155,12 +166,28 @@ app.post('/api/ban', (req, res) => {
         if (targetData.ip) bannedIPs.add(targetData.ip);
         if (targetData.token) bannedTokens.add(targetData.token);
         
-        // Τον σβήνουμε αμέσως από τους online
+        saveBans(); // Αποθήκευση στο αρχείο
         delete onlineUsers[targetUser];
         res.json({ success: true });
     } else {
         res.status(404).json({ error: 'User not found' });
     }
+});
+
+// 🔥 ΝΕΟ: UNBAN (Ξεμπανάρισμα)
+app.post('/api/unban', (req, res) => {
+    const { identifier, adminName } = req.body;
+    if (adminName !== 'sakis') return res.status(403).json({ error: 'Unauthorized' });
+    
+    bannedIPs.delete(identifier);
+    bannedTokens.delete(identifier);
+    saveBans(); // Ενημέρωση αρχείου
+    res.json({ success: true });
+});
+
+// 🔥 ΝΕΟ: ΛΙΣΤΑ BANS (Για το Panel σου)
+app.get('/api/banned-list', (req, res) => {
+    res.json({ ips: Array.from(bannedIPs), tokens: Array.from(bannedTokens) });
 });
 
 app.post('/api/logout', (req, res) => {
