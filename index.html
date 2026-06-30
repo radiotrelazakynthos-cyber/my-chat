@@ -316,13 +316,13 @@
             initialLoad = true;
             fetchMessages();
         };
-       // Αντικατάστησε τις γραμμές με setInterval
-if (isLoggedIn) {
-    fetchMessages();
-    setInterval(fetchMessages, 1000);     // πιο γρήγορο
-    setInterval(fetchPresence, 8000);     // λιγότερο συχνό
-    setInterval(updatePresence, 5000);
-}
+        if (isLoggedIn) {
+            updatePresence();
+            setInterval(updatePresence, 4000);
+            fetchPresence();
+            setInterval(fetchPresence, 4000);
+            document.getElementById("chat-header").style.display = "flex";
+        }
         document.getElementById("enter-btn").onclick = async () => {
             let rawInput = document.getElementById("username").value.trim();
             if (!rawInput) return alert("Πρέπει να βάλεις όνομα!");
