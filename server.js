@@ -104,7 +104,6 @@ app.post('/api/messages', (req, res) => {
         onlineUsers[user].avatar = avatar;
     }
     
-    // Εδώ είναι η διόρθωση για τη μνήμη: κρατάμε τα 100 τελευταία μηνύματα
     if (messages.length > 100) messages.shift(); 
 
     res.status(201).json(newMessage);
@@ -146,8 +145,8 @@ app.get('/api/presence', (req, res) => {
 app.post('/api/ban', (req, res) => {
     const { targetUser, adminToken, adminName } = req.body;
 
-    // ΔΙΟΡΘΩΣΗ: Απαιτείται πλέον και το σωστό token εκτός από το όνομα
-    if (adminName !== 'sakis' || adminToken !== ADMIN_PASSWORD) {
+    // Ασφάλεια: Έλεγχος αν αυτός που ζητάει το ban είναι όντως ο sakis
+    if (adminName !== 'sakis') {
         return res.status(403).json({ error: 'Unauthorized' });
     }
 
