@@ -49,7 +49,7 @@
         .user-row:hover {
             background: #00ff00; color: #000;
         }
-       
+        
         .my-row {
             margin: 5px 0; padding: 6px; border: 1px dashed #00ff00;
             border-radius: 5px; cursor: pointer; background: rgba(0,20,0,0.2);
@@ -107,7 +107,7 @@
             border: none; border-radius: 8px; font-weight: bold; cursor: pointer;
         }
         button:hover { background: #33ff33; }
-       
+        
         .volume-container {
             display: flex; align-items: center; gap: 5px; background: #111;
             border: 2px solid #00ff00; border-radius: 8px; padding: 0 8px; height: 36px;
@@ -126,7 +126,7 @@
         .message-content { display: flex; flex-direction: column; }
         .message.private-msg { border: 1px dashed #ff00ff; background: rgba(60, 0, 60, 0.7); }
         .message.own.private-msg { background: rgba(100, 0, 100, 0.85); }
-       
+        
         #emoji-picker {
             display: none; position: absolute; bottom: 60px; background: #111;
             border: 2px solid #00ff00; padding: 10px; border-radius: 10px;
@@ -254,15 +254,15 @@
                 const usersData = await res.json();
                 const box = document.getElementById("users-box");
                 box.innerHTML = "";
-               
+                
                 usersData.forEach(u => {
                     let name = u.user;
                     let av = u.avatar || "";
-                   
+                    
                     if(name !== currentName && av) {
                         globalUsersAvatars[name] = av;
                     }
-                   
+                    
                     let finalAvatar = name === currentName ? currentAvatar : (av || globalUsersAvatars[name] || "");
                     let imgTag = finalAvatar ? `<img src="${finalAvatar}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
                     if (name !== currentName) {
@@ -333,7 +333,7 @@
                     body: JSON.stringify({ loginString: rawInput, token: deviceToken })
                 });
                 let data = await res.json();
-               
+                
                 if (!data.success) {
                     if (data.error === 'banned') handleBannedUser();
                     document.getElementById("username").value = "";
@@ -345,7 +345,7 @@
                 const welcomeDiv = document.getElementById("welcome-overlay");
                 welcomeDiv.innerHTML = data.isAdmin ? `Καλώς ορισες Αρχηγέ <strong>${data.username}</strong>! 👑<br>Φόρτωση...` : `Καλώς ήρθες, <strong>${data.username}</strong>! 🎉<br>Φόρτωση...`;
                 welcomeDiv.style.display = "flex";
-               
+                
                 setTimeout(() => location.reload(), 1200);
             } catch(e) { alert("Σφάλμα σύνδεσης"); }
         };
@@ -390,7 +390,7 @@
             try {
                 const res = await fetch(`/api/messages?user=${encodeURIComponent(currentName)}&token=${deviceToken}`);
                 if (res.status === 403) handleBannedUser();
-               
+                
                 const messages = await res.json();
                 let htmlContent = "";
                 let hasIncomingNewPrivate = false;
@@ -423,7 +423,7 @@
                 visibleMessages.forEach(data => {
                     const isOwn = data.user === currentName;
                     const isPrivate = !!data.to;
-                   
+                    
                     let userAv = isOwn ? currentAvatar : (data.avatar || globalUsersAvatars[data.user] || "");
                     let msgAvatarTag = userAv ? `<img src="${userAv}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
                     htmlContent += `<div class="message ${isOwn ? 'own' : ''} ${isPrivate ? 'private-msg' : ''}">`;
@@ -438,7 +438,7 @@
                 chatBox.innerHTML = htmlContent;
                 if (initialLoad || isAtBottom) chatBox.scrollTop = chatBox.scrollHeight;
                 if (shouldPlaySound) notificationSound.play().catch(e => {});
-               
+                
                 initialLoad = false;
             } catch(e) {}
         }
@@ -457,7 +457,6 @@
             localStorage.clear();
             location.reload();
         };
-        // Volume Control
         const volumeControl = document.getElementById("volume-control");
         const volumeIcon = document.getElementById("volume-icon");
         volumeControl.addEventListener("input", (e) => {
@@ -466,11 +465,10 @@
             if (val === 0) volumeIcon.textContent = "🔇";
             else if (val < 0.4) volumeIcon.textContent = "🔈";
             else volumeIcon.textContent = "🔊";
-           
+            
             notificationSound.currentTime = 0;
             notificationSound.play().catch(err => {});
         });
-                // Emojis - Μεγαλύτερη λίστα
         const emojis = [
             "😀","😂","😍","🥰","😘","😎","😏","🥳","😢","😭","😱","😡","😤","🥺","😌",
             "🔥","❤️","💔","💯","👍","👎","👏","🙌","🙏","👀","🎉","🚀","💪","✨","⭐",
@@ -494,42 +492,42 @@
             picker.style.display = picker.style.display === "flex" ? "none" : "flex";
         };
         document.addEventListener("click", () => picker.style.display = "none");
-
-        // ====================== IMAGE UPLOAD ΜΕ LOADING ======================
         const imageBtn = document.getElementById("image-upload-btn");
         const imageInput = document.getElementById("image-upload");
-
         imageBtn.onclick = () => {
             if (imageBtn.classList.contains("loading")) return;
             imageInput.click();
         };
-
         imageInput.onchange = async (e) => {
             const file = e.target.files[0];
             if (!file || !isLoggedIn) return;
-
             imageBtn.classList.add("loading");
-
             try {
                 const reader = new FileReader();
-                const dataUrl = await new Promise((resolve, reject) => {
-                    reader.onload = () => resolve(reader.result);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
-
-                await sendMessage("", dataUrl);
-
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.onload = async () => {
+                        const canvas = document.createElement("canvas");
+                        const MAX_WIDTH = 400;
+                        const scale = MAX_WIDTH / img.width;
+                        canvas.width = MAX_WIDTH;
+                        canvas.height = img.height * scale;
+                        const ctx = canvas.getContext("2d");
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.7);
+                        await sendMessage("", compressedDataUrl);
+                        imageBtn.classList.remove("loading");
+                        imageInput.value = "";
+                    };
+                    img.src = event.target.result;
+                };
+                reader.readAsDataURL(file);
             } catch (err) {
                 console.error(err);
-                alert("Σφάλμα κατά την αποστολή της εικόνας.");
-            } finally {
                 imageBtn.classList.remove("loading");
-                imageInput.value = "";
+                alert("Σφάλμα κατά την αποστολή της εικόνας.");
             }
         };
-        // ===================================================================
-
         let isDark = true;
         document.getElementById("toggle-theme").onclick = () => {
             isDark = !isDark;
