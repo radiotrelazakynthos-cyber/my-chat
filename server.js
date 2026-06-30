@@ -7,18 +7,23 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(__dirname));
 
-// Μνήμη
+// Μνήμη του server
 let messages = [];
 let onlineUsers = {}; 
+
+// Λίστα με τις μπλοκαρισμένες ταυτότητες (IPs και Device Tokens)
 let bannedIPs = new Set();
 let bannedTokens = new Set();
 
+// Ο ΜΥΣΤΙΚΟΣ ΣΟΥ ΚΩΔΙΚΟΣ
 const ADMIN_PASSWORD = "sakis019630";
 
+// Συνάρτηση που βρίσκει την πραγματική IP του χρήστη στο Render
 function getClientIP(req) {
     return req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 }
 
+// Έλεγχος αν μια συσκευή ή IP έχει φάει Ban
 function isBanned(req, token) {
     const ip = getClientIP(req);
     if (bannedIPs.has(ip)) return true;
@@ -26,13 +31,11 @@ function isBanned(req, token) {
     return false;
 }
 
-// Keep-alive για Render
-app.get('/ping', (req, res) => res.status(200).send('ok'));
-
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Endpoint για είσοδο και έλεγχο δικαιωμάτων / Ban
 app.post('/api/login', (req, res) => {
     const { loginString, token } = req.body;
     const ip = getClientIP(req);
@@ -44,6 +47,7 @@ app.post('/api/login', (req, res) => {
     let username = loginString.trim();
     let isAdmin = false;
 
+    // Έλεγχος αν έβαλε τον κωδικό διαχειριστή (sakis:sakis019630)
     if (username.includes(':')) {
         const parts = username.split(':');
         const namePart = parts[0].trim();
@@ -123,7 +127,7 @@ app.post('/api/presence', (req, res) => {
 });
 
 app.get('/api/presence', (req, res) => {
-    const cutoff = Date.now() - 30000; 
+    const cutoff = Date.now() - 20000; 
     const active = [];
     
     for (const [username, userData] of Object.entries(onlineUsers)) {
@@ -137,9 +141,11 @@ app.get('/api/presence', (req, res) => {
     res.json(active);
 });
 
+// 🔥 ΤΟ ΚΟΥΜΠΙ ΤΟΥ BAN (Μόνο για τον Admin)
 app.post('/api/ban', (req, res) => {
     const { targetUser, adminToken, adminName } = req.body;
 
+    // Ασφάλεια: Έλεγχος αν αυτός που ζητάει το ban είναι όντως ο sakis
     if (adminName !== 'sakis') {
         return res.status(403).json({ error: 'Unauthorized' });
     }
@@ -149,6 +155,7 @@ app.post('/api/ban', (req, res) => {
         if (targetData.ip) bannedIPs.add(targetData.ip);
         if (targetData.token) bannedTokens.add(targetData.token);
         
+        // Τον σβήνουμε αμέσως από τους online
         delete onlineUsers[targetUser];
         res.json({ success: true });
     } else {
