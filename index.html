@@ -49,7 +49,6 @@
         .user-row:hover {
             background: #00ff00; color: #000;
         }
-        
         .my-row {
             margin: 5px 0; padding: 6px; border: 1px dashed #00ff00;
             border-radius: 5px; cursor: pointer; background: rgba(0,20,0,0.2);
@@ -107,7 +106,6 @@
             border: none; border-radius: 8px; font-weight: bold; cursor: pointer;
         }
         button:hover { background: #33ff33; }
-        
         .volume-container {
             display: flex; align-items: center; gap: 5px; background: #111;
             border: 2px solid #00ff00; border-radius: 8px; padding: 0 8px; height: 36px;
@@ -126,7 +124,6 @@
         .message-content { display: flex; flex-direction: column; }
         .message.private-msg { border: 1px dashed #ff00ff; background: rgba(60, 0, 60, 0.7); }
         .message.own.private-msg { background: rgba(100, 0, 100, 0.85); }
-        
         #emoji-picker {
             display: none; position: absolute; bottom: 60px; background: #111;
             border: 2px solid #00ff00; padding: 10px; border-radius: 10px;
@@ -135,25 +132,13 @@
         .emoji { font-size: 24px; cursor: pointer; padding: 4px; }
         .emoji:hover { background: #00ff00; color: #000; border-radius: 4px; }
         .back-btn { background: #ff3333; color: white; padding: 4px 10px; height: auto; font-size: 13px; }
-
-        #image-upload-btn {
-            position: relative;
-            min-width: 52px;
-        }
-        #image-upload-btn.loading {
-            opacity: 0.75;
-            background: #008800;
-            pointer-events: none;
-        }
-        #image-upload-btn.loading::after {
-            content: " Ανεβαίνει...";
-            font-size: 13px;
-            animation: pulse 1.8s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 0.7; }
-            50% { opacity: 1; }
-        }
+        #image-upload-btn { position: relative; min-width: 52px; }
+        #image-upload-btn.loading { opacity: 0.75; background: #008800; pointer-events: none; }
+        #image-upload-btn.loading::after { content: " Ανεβαίνει..."; font-size: 13px; animation: pulse 1.8s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+        /* Reset button style */
+        .reset-btn { background: #ff3333; color: white; border: none; border-radius: 8px; padding: 0 15px; font-weight: bold; cursor: pointer; height: 40px; }
+        .reset-btn:hover { background: #ff0000; }
     </style>
     <style>
         body {
@@ -181,12 +166,10 @@
                 <p>Για να δεις τα μηνύματα και να συμμετάσχεις<br>βάλε το όνομά σου και κάνε Είσοδος!</p>
             </div>
         </div>
-        
         <div id="login-screen">
             <input type="text" id="username" placeholder="Το όνομά σου...">
             <button id="enter-btn">Είσοδος</button>
         </div>
-        
         <input type="file" id="my-avatar-input" accept="image/*" style="display: none;">
         <div id="chat-controls" style="display:none;">
             <input type="text" id="msg-input" placeholder="Γράψε μήνυμα...">
@@ -199,12 +182,12 @@
                 <span id="volume-icon">🔊</span>
                 <input type="range" id="volume-control" class="volume-slider" min="0" max="1" step="0.1" value="0.5">
             </div>
+            <button id="reset-btn" class="reset-btn">🗑️ RESET</button>
             <button id="exit-btn">🚪 Έξοδος</button>
         </div>
     </div>
     <div id="emoji-picker"></div>
-
-    <script>
+	<script>
         let deviceToken = localStorage.getItem("chatDeviceToken");
         if (!deviceToken) {
             deviceToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -322,6 +305,20 @@
             fetchMessages();
         };
         
+        // Λογική RESET
+        document.getElementById("reset-btn").onclick = async () => {
+            if (!isAdmin) return alert("Μόνο ο admin μπορεί να κάνει reset!");
+            if (!confirm("ΠΡΟΣΟΧΗ: Θα διαγραφούν ΟΛΑ τα μηνύματα. Συνέχεια;")) return;
+            try {
+                await fetch('/api/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ admin: currentName, token: deviceToken })
+                });
+                location.reload();
+            } catch(e) { alert("Σφάλμα στο reset"); }
+        };
+
         if (isLoggedIn) {
             runUpdates();
             setInterval(runUpdates, 4000);
@@ -341,7 +338,7 @@
                 
                 if (!data.success) {
                     if (data.error === 'banned') handleBannedUser();
-                    else alert(data.error); // Εδώ εμφανίζεται το μήνυμα σφάλματος από τον server
+                    else alert(data.error);
                     document.getElementById("username").value = "";
                     return;
                 }

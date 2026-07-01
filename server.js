@@ -35,9 +35,24 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// ΝΕΟ ENDPOINT ΓΙΑ ΤΟ RESET (Μόνο για τον Sakis)
+app.post('/api/clear-all', (req, res) => {
+    const { adminName } = req.body;
+    if (adminName === "sakis") {
+        // Διαγραφή όλων εκτός από τον Sakis
+        for (let user in onlineUsers) {
+            if (user !== "sakis") {
+                delete onlineUsers[user];
+            }
+        }
+        res.json({ success: true });
+    } else {
+        res.status(403).json({ success: false, error: "Μη εξουσιοδοτημένη ενέργεια" });
+    }
+});
+
 app.post('/api/login', (req, res) => {
     const { loginString, token } = req.body;
-    const ip = getClientIP(req);
 
     if (isBanned(req, token)) {
         return res.json({ success: false, error: 'banned' });
@@ -46,13 +61,10 @@ app.post('/api/login', (req, res) => {
     let username = loginString.trim();
     let isAdmin = false;
 
-    // ΕΛΕΓΧΟΣ ΑΠΑΓΟΡΕΥΜΕΝΩΝ ΟΝΟΜΑΤΩΝ
     if (forbiddenNames.includes(username)) {
         return res.json({ success: false, error: 'Απαγορευμένο όνομα' });
     }
 
-    // ΕΛΕΓΧΟΣ ΑΝ ΕΙΝΑΙ ΗΔΗ ONLINE (ΔΙΠΛΟΤΥΠΑ)
-    // Ελέγχουμε αν υπάρχει ήδη στο αντικείμενο onlineUsers
     if (onlineUsers[username]) {
         return res.json({ success: false, error: 'Το όνομα χρησιμοποιείται ήδη' });
     }
@@ -151,7 +163,7 @@ app.get('/api/presence', (req, res) => {
 });
 
 app.post('/api/ban', (req, res) => {
-    const { targetUser, adminToken, adminName } = req.body;
+    const { targetUser, adminName } = req.body;
 
     if (adminName !== 'sakis') {
         return res.status(403).json({ error: 'Unauthorized' });
