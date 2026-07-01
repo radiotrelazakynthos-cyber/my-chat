@@ -136,8 +136,11 @@
         #image-upload-btn.loading { opacity: 0.75; background: #008800; pointer-events: none; }
         #image-upload-btn.loading::after { content: " Ανεβαίνει..."; font-size: 13px; animation: pulse 1.8s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+        /* Reset button style */
         .reset-btn { background: #ff3333; color: white; border: none; border-radius: 8px; padding: 0 15px; font-weight: bold; cursor: pointer; height: 40px; display: none; }
         .reset-btn:hover { background: #ff0000; }
+    </style>
+    <style>
         body {
             background-image: url('fonto.jpg');
             background-repeat: no-repeat; background-attachment: fixed;
@@ -202,28 +205,9 @@
         let knownMessageIds = new Set();
         let globalUsersAvatars = {};
         
+        // Εμφάνιση Reset κουμπιού ΜΟΝΟ για τον Sakis
         if (currentName === "sakis") {
             document.getElementById("reset-btn").style.display = "block";
-        }
-
-        async function checkResetVersion() {
-            try {
-                const res = await fetch('/api/reset-status');
-                const data = await res.json();
-                const savedVersion = localStorage.getItem("resetVersion") || "0";
-                
-                if (data.version.toString() !== savedVersion) {
-                    localStorage.setItem("resetVersion", data.version);
-                    
-                    if (currentName === "sakis") {
-                        knownMessageIds = new Set();
-                        document.getElementById("chat-box").innerHTML = "";
-                    } else {
-                        localStorage.clear();
-                        location.reload();
-                    }
-                }
-            } catch(e) {}
         }
 
         const myAvatarInput = document.getElementById("my-avatar-input");
@@ -268,7 +252,11 @@
                 usersData.forEach(u => {
                     let name = u.user;
                     let av = u.avatar || "";
-                    if(name !== currentName && av) { globalUsersAvatars[name] = av; }
+                    
+                    if(name !== currentName && av) {
+                        globalUsersAvatars[name] = av;
+                    }
+                    
                     let finalAvatar = name === currentName ? currentAvatar : (av || globalUsersAvatars[name] || "");
                     let imgTag = finalAvatar ? `<img src="${finalAvatar}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
                     if (name !== currentName) {
@@ -289,7 +277,7 @@
                 let res = await fetch('/api/ban', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ targetUser: username, adminName: currentName })
+                    body: JSON.stringify({ targetUser: username, adminName: currentName, adminToken: deviceToken })
                 });
                 let data = await res.json();
                 if (data.success) {
@@ -323,6 +311,7 @@
             fetchMessages();
         };
         
+        // ΔΙΟΡΘΩΜΕΝΗ ΛΟΓΙΚΗ RESET
         document.getElementById("reset-btn").onclick = async () => {
             if (currentName !== "sakis") return alert("Μόνο ο Sakis έχει πρόσβαση!");
             if (!confirm("ΠΡΟΣΟΧΗ: Θα διαγραφούν ΟΛΑ τα μηνύματα και οι χρήστες. Συνέχεια;")) return;
@@ -332,15 +321,13 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ adminName: currentName })
                 });
+                location.reload();
             } catch(e) { alert("Σφάλμα στο reset"); }
         };
 
         if (isLoggedIn) {
             runUpdates();
-            setInterval(() => {
-                runUpdates();
-                checkResetVersion();
-            }, 4000);
+            setInterval(runUpdates, 4000);
             document.getElementById("chat-header").style.display = "flex";
         }
         
@@ -411,15 +398,19 @@
                     handleBannedUser();
                     return;
                 }
+                
                 const messages = await res.json();
                 let htmlContent = "";
                 let hasIncomingNewPrivate = false;
                 let shouldPlaySound = false;
                 const chatBox = document.getElementById("chat-box");
+
                 messages.forEach(m => {
                     const isOwn = m.user === currentName;
                     const isNew = !knownMessageIds.has(m.id);
-                    if (m.avatar && m.user !== currentName) { globalUsersAvatars[m.user] = m.avatar; }
+                    if (m.avatar && m.user !== currentName) {
+                        globalUsersAvatars[m.user] = m.avatar;
+                    }
                     if (isNew) {
                         knownMessageIds.add(m.id);
                         if (!isOwn && !initialLoad) {
@@ -427,15 +418,20 @@
                             else if (m.to === currentName) shouldPlaySound = true;
                         }
                         if (m.to === currentName && m.user !== activePrivateTarget) {
-                            if (!unreadFromUsers.has(m.user)) { unreadFromUsers.add(m.user); hasIncomingNewPrivate = true; }
+                            if (!unreadFromUsers.has(m.user)) {
+                                unreadFromUsers.add(m.user);
+                                hasIncomingNewPrivate = true;
+                            }
                         }
                     }
                 });
                 if (hasIncomingNewPrivate) fetchPresence();
+                
                 const visibleMessages = messages.filter(m => {
                     if (activePrivateTarget === null) return !m.to;
                     else return m.to === activePrivateTarget || (m.user === activePrivateTarget && m.to === currentName);
                 }).slice(-50);
+                
                 visibleMessages.forEach(data => {
                     const isOwn = data.user === currentName;
                     const isPrivate = !!data.to;
@@ -449,6 +445,7 @@
                     if (data.image) htmlContent += `<img src="${data.image}" style="max-width:280px; border-radius:8px; margin-top:6px;">`;
                     htmlContent += `</div></div>`;
                 });
+                
                 const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight <= 30;
                 chatBox.innerHTML = htmlContent;
                 if (initialLoad || isAtBottom) chatBox.scrollTop = chatBox.scrollHeight;
@@ -456,6 +453,7 @@
                 initialLoad = false;
             } catch(e) {} finally { window.isFetching = false; }
         }
+        
         document.getElementById("exit-btn").onclick = async () => {
             try {
                 await fetch('/api/logout', {
@@ -478,7 +476,13 @@
             notificationSound.currentTime = 0;
             notificationSound.play().catch(err => {});
         });
-        const emojis = ["😀","😂","😍","🥰","😘","😎","😏","🥳","😢","😭","😱","😡","😤","🥺","😌","🔥","❤️","💔","💯","👍","👎","👏","🙌","🙏","👀","🎉","🚀","💪","✨","⭐"];
+        const emojis = [
+            "😀","😂","😍","🥰","😘","😎","😏","🥳","😢","😭","😱","😡","😤","🥺","😌",
+            "🔥","❤️","💔","💯","👍","👎","👏","🙌","🙏","👀","🎉","🚀","💪","✨","⭐",
+            "😂","🤣","🥲","😅","😆","😉","😊","😋","😛","😜","🤪","🤩","🥹","😭","😤",
+            "🙂","🙃","🫠","🤔","🤨","😐","😑","😶","🤐","😏","😒","🙄","😬","😮‍💨","🤥",
+            "🍕","🍔","☕","🍺","🎂","🎈","🏆","⚽","🎮","📱","💻","🎥","🎵","📸","🔗"
+        ];
         const picker = document.getElementById("emoji-picker");
         emojis.forEach(emo => {
             const span = document.createElement("span");
@@ -497,7 +501,10 @@
         document.addEventListener("click", () => picker.style.display = "none");
         const imageBtn = document.getElementById("image-upload-btn");
         const imageInput = document.getElementById("image-upload");
-        imageBtn.onclick = () => { if (imageBtn.classList.contains("loading")) return; imageInput.click(); };
+        imageBtn.onclick = () => {
+            if (imageBtn.classList.contains("loading")) return;
+            imageInput.click();
+        };
         imageInput.onchange = async (e) => {
             const file = e.target.files[0];
             if (!file || !isLoggedIn) return;
@@ -510,7 +517,13 @@
                     reader.readAsDataURL(file);
                 });
                 await sendMessage("", dataUrl);
-            } catch (err) { alert("Σφάλμα κατά την αποστολή της εικόνας."); } finally { imageBtn.classList.remove("loading"); imageInput.value = ""; }
+            } catch (err) {
+                console.error(err);
+                alert("Σφάλμα κατά την αποστολή της εικόνας.");
+            } finally {
+                imageBtn.classList.remove("loading");
+                imageInput.value = "";
+            }
         };
         let isDark = true;
         document.getElementById("toggle-theme").onclick = () => {
