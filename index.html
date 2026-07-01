@@ -49,6 +49,7 @@
         .user-row:hover {
             background: #00ff00; color: #000;
         }
+        
         .my-row {
             margin: 5px 0; padding: 6px; border: 1px dashed #00ff00;
             border-radius: 5px; cursor: pointer; background: rgba(0,20,0,0.2);
@@ -106,6 +107,7 @@
             border: none; border-radius: 8px; font-weight: bold; cursor: pointer;
         }
         button:hover { background: #33ff33; }
+        
         .volume-container {
             display: flex; align-items: center; gap: 5px; background: #111;
             border: 2px solid #00ff00; border-radius: 8px; padding: 0 8px; height: 36px;
@@ -124,6 +126,7 @@
         .message-content { display: flex; flex-direction: column; }
         .message.private-msg { border: 1px dashed #ff00ff; background: rgba(60, 0, 60, 0.7); }
         .message.own.private-msg { background: rgba(100, 0, 100, 0.85); }
+        
         #emoji-picker {
             display: none; position: absolute; bottom: 60px; background: #111;
             border: 2px solid #00ff00; padding: 10px; border-radius: 10px;
@@ -132,11 +135,33 @@
         .emoji { font-size: 24px; cursor: pointer; padding: 4px; }
         .emoji:hover { background: #00ff00; color: #000; border-radius: 4px; }
         .back-btn { background: #ff3333; color: white; padding: 4px 10px; height: auto; font-size: 13px; }
-        #image-upload-btn { position: relative; min-width: 52px; }
-        #image-upload-btn.loading { opacity: 0.75; background: #008800; pointer-events: none; }
-        #image-upload-btn.loading::after { content: " Ανεβαίνει..."; font-size: 13px; animation: pulse 1.8s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
-        body { background-image: url('fonto.jpg'); background-repeat: no-repeat; background-attachment: fixed; background-size: cover; background-position: center; }
+
+        /* === LOADING ΓΙΑ ΕΙΚΟΝΑ === */
+        #image-upload-btn {
+            position: relative;
+            min-width: 52px;
+        }
+        #image-upload-btn.loading {
+            opacity: 0.75;
+            background: #008800;
+            pointer-events: none;
+        }
+        #image-upload-btn.loading::after {
+            content: " Ανεβαίνει...";
+            font-size: 13px;
+            animation: pulse 1.8s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+    </style>
+    <style>
+        body {
+            background-image: url('fonto.jpg');
+            background-repeat: no-repeat; background-attachment: fixed;
+            background-size: cover; background-position: center;
+        }
     </style>
 </head>
 <body>
@@ -157,10 +182,12 @@
                 <p>Για να δεις τα μηνύματα και να συμμετάσχεις<br>βάλε το όνομά σου και κάνε Είσοδος!</p>
             </div>
         </div>
+        
         <div id="login-screen">
             <input type="text" id="username" placeholder="Το όνομά σου...">
             <button id="enter-btn">Είσοδος</button>
         </div>
+        
         <input type="file" id="my-avatar-input" accept="image/*" style="display: none;">
         <div id="chat-controls" style="display:none;">
             <input type="text" id="msg-input" placeholder="Γράψε μήνυμα...">
@@ -193,9 +220,9 @@
         notificationSound.volume = 0.5;
         let initialLoad = true;
         let unreadFromUsers = new Set();
+        let knownMessageIds = new Set();
         let globalUsersAvatars = {};
         const myAvatarInput = document.getElementById("my-avatar-input");
-        
         myAvatarInput.onchange = (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -210,10 +237,12 @@
         };
         function triggerAvatarUpload() { myAvatarInput.click(); }
         
+        // --- ΕΝΟΠΟΙΗΜΕΝΟ INTERFACE ΓΙΑ ΒΕΛΤΙΣΤΟΠΟΙΗΣΗ ---
         async function runUpdates() {
             if (!isLoggedIn) return;
             await Promise.all([updatePresence(), fetchPresence(), fetchMessages()]);
         }
+
         async function updatePresence() {
             if (!isLoggedIn) return;
             try {
@@ -232,10 +261,15 @@
                 const usersData = await res.json();
                 const box = document.getElementById("users-box");
                 box.innerHTML = "";
+                
                 usersData.forEach(u => {
                     let name = u.user;
                     let av = u.avatar || "";
-                    if(name !== currentName && av) globalUsersAvatars[name] = av;
+                    
+                    if(name !== currentName && av) {
+                        globalUsersAvatars[name] = av;
+                    }
+                    
                     let finalAvatar = name === currentName ? currentAvatar : (av || globalUsersAvatars[name] || "");
                     let imgTag = finalAvatar ? `<img src="${finalAvatar}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
                     if (name !== currentName) {
@@ -251,21 +285,31 @@
         }
         async function executeBan(event, username) {
             event.stopPropagation();
-            if (!confirm(`Θέλεις σίγουρα να αποκλείσεις τον ${username};`)) return;
+            if (!confirm(`Θέλεις σίγουρα να αποκλείσεις (BAN) οριστικά τον χρήστη ${username};`)) return;
             try {
                 let res = await fetch('/api/ban', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ targetUser: username, adminName: currentName, adminToken: deviceToken })
                 });
-                if ((await res.json()).success) fetchPresence();
-            } catch(e) {}
+                let data = await res.json();
+                if (data.success) {
+                    alert(`Ο χρήστης ${username} αποκλείστηκε επιτυχώς!`);
+                    fetchPresence();
+                }
+            } catch(e) { alert("Σφάλμα κατά το Ban"); }
         }
-        function handleBannedUser() { localStorage.clear(); alert("Έχεις αποκλειστεί!"); location.reload(); }
+        function handleBannedUser() {
+            localStorage.clear();
+            alert("Έχεις αποκλειστεί οριστικά (BAN) από αυτό το chat!");
+            location.reload();
+        }
         function startPrivateChat(targetUser) {
             activePrivateTarget = targetUser;
             unreadFromUsers.delete(targetUser);
             document.getElementById("room-title").textContent = `Δωμάτιο: ${targetUser} [Πριβέ]`;
+            document.getElementById("room-title").style.color = "#ff00ff";
+            document.getElementById("chat-wrapper").style.borderColor = "#ff00ff";
             document.getElementById("back-to-global").style.display = "inline-block";
             initialLoad = true;
             fetchMessages();
@@ -273,50 +317,96 @@
         document.getElementById("back-to-global").onclick = () => {
             activePrivateTarget = null;
             document.getElementById("room-title").textContent = `Δωμάτιο: Γενικό Chat`;
+            document.getElementById("room-title").style.color = "#00ff00";
+            document.getElementById("chat-wrapper").style.borderColor = "#00ff00";
             document.getElementById("back-to-global").style.display = "none";
             initialLoad = true;
             fetchMessages();
         };
-        if (isLoggedIn) { runUpdates(); setInterval(runUpdates, 4000); document.getElementById("chat-header").style.display = "flex"; }
+        
+        if (isLoggedIn) {
+            runUpdates();
+            setInterval(runUpdates, 4000);
+            document.getElementById("chat-header").style.display = "flex";
+        }
+        
         document.getElementById("enter-btn").onclick = async () => {
             let rawInput = document.getElementById("username").value.trim();
-            if (!rawInput) return;
+            if (!rawInput) return alert("Πρέπει να βάλεις όνομα!");
             try {
                 let res = await fetch('/api/login', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ loginString: rawInput, token: deviceToken })
                 });
                 let data = await res.json();
-                if (!data.success) return;
+                
+                if (!data.success) {
+                    if (data.error === 'banned') handleBannedUser();
+                    document.getElementById("username").value = "";
+                    document.getElementById("username").placeholder = "Το όνομά σου...";
+                    return;
+                }
                 localStorage.setItem("chatUser", data.username);
                 localStorage.setItem("chatIsAdmin", data.isAdmin ? "true" : "false");
-                location.reload();
-            } catch(e) {}
+                const welcomeDiv = document.getElementById("welcome-overlay");
+                welcomeDiv.innerHTML = data.isAdmin ? `Καλώς ορισες Αρχηγέ <strong>${data.username}</strong>! 👑<br>Φόρτωση...` : `Καλώς ήρθες, <strong>${data.username}</strong>! 🎉<br>Φόρτωση...`;
+                welcomeDiv.style.display = "flex";
+                
+                setTimeout(() => location.reload(), 1200);
+            } catch(e) { alert("Σφάλμα σύνδεσης"); }
         };
-        if (isLoggedIn) { document.getElementById("login-screen").style.display = "none"; document.getElementById("chat-controls").style.display = "flex"; document.getElementById("chat-cover").style.display = "none"; }
+        if (isLoggedIn) {
+            document.getElementById("login-screen").style.display = "none";
+            document.getElementById("chat-controls").style.display = "flex";
+            document.getElementById("chat-cover").style.display = "none";
+        } else {
+            currentName = "Guest_" + Math.floor(Math.random() * 1000);
+            document.getElementById("username").placeholder = "Το όνομά σου...";
+        }
         async function sendMessage(text, imageUrl = null) {
             if (!isLoggedIn || (!text && !imageUrl)) return;
             try {
-                await fetch('/api/messages', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user: currentName, avatar: currentAvatar, text, image: imageUrl, to: activePrivateTarget, token: deviceToken })
+                let res = await fetch('/api/messages', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user: currentName,
+                        avatar: currentAvatar,
+                        text: text || "",
+                        image: imageUrl,
+                        to: activePrivateTarget,
+                        token: deviceToken
+                    })
                 });
+                if (res.status === 403) handleBannedUser();
                 fetchMessages();
             } catch(e) {}
         }
-        document.getElementById("send-btn").onclick = () => { const input = document.getElementById("msg-input"); sendMessage(input.value.trim()); input.value = ""; };
-
-        async function fetchMessages() {
+        document.getElementById("send-btn").onclick = () => {
+            const input = document.getElementById("msg-input");
+            sendMessage(input.value.trim());
+            input.value = "";
+        };
+     
+               
             if (!isLoggedIn || window.isFetching) return;
             window.isFetching = true;
             try {
                 const res = await fetch(`/api/messages?user=${encodeURIComponent(currentName)}&token=${deviceToken}`);
-                if (res.status === 403) { handleBannedUser(); return; }
+                if (res.status === 403) {
+                    handleBannedUser();
+                    return;
+                }
+                
                 const messages = await res.json();
+                
+                // Επιλογή μόνο των τελευταίων 50 μηνυμάτων
                 const visibleMessages = messages.slice(-50).filter(m => {
                     if (activePrivateTarget === null) return !m.to;
                     else return m.to === activePrivateTarget || (m.user === activePrivateTarget && m.to === currentName);
                 });
+
                 let htmlContent = "";
                 visibleMessages.forEach(data => {
                     const isOwn = data.user === currentName;
@@ -324,11 +414,14 @@
                     let userAv = isOwn ? currentAvatar : (data.avatar || globalUsersAvatars[data.user] || "");
                     let msgAvatarTag = userAv ? `<img src="${userAv}" class="avatar">` : `<div class="avatar" style="display:flex;align-items:center;justify-content:center;font-size:14px;background:#333;">👤</div>`;
                     htmlContent += `<div class="message ${isOwn ? 'own' : ''} ${isPrivate ? 'private-msg' : ''}">`;
-                    htmlContent += msgAvatarTag + `<div class="message-content"><strong>${data.user}${isPrivate ? ' [Πριβέ]' : ''}:</strong> `;
+                    htmlContent += msgAvatarTag;
+                    htmlContent += `<div class="message-content">`;
+                    htmlContent += `<strong>${data.user}${isPrivate ? ' [Πριβέ]' : ''}:</strong> `;
                     if (data.text) htmlContent += `<span>${data.text}</span>`;
                     if (data.image) htmlContent += `<img src="${data.image}" style="max-width:280px; border-radius:8px; margin-top:6px;">`;
                     htmlContent += `</div></div>`;
                 });
+                
                 const chatBox = document.getElementById("chat-box");
                 const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight <= 30;
                 chatBox.innerHTML = htmlContent;
@@ -337,8 +430,84 @@
             } catch(e) {} finally { window.isFetching = false; }
         }
         
-        document.getElementById("exit-btn").onclick = async () => { localStorage.clear(); location.reload(); };
-        // (Emoji/Image/Theme logic remains same as yours)
+        document.getElementById("exit-btn").onclick = async () => {
+            try {
+                await fetch('/api/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user: currentName })
+                });
+            } catch(e) {}
+            localStorage.clear();
+            location.reload();
+        };
+        const volumeControl = document.getElementById("volume-control");
+        const volumeIcon = document.getElementById("volume-icon");
+        volumeControl.addEventListener("input", (e) => {
+            const val = parseFloat(e.target.value);
+            notificationSound.volume = val;
+            if (val === 0) volumeIcon.textContent = "🔇";
+            else if (val < 0.4) volumeIcon.textContent = "🔈";
+            else volumeIcon.textContent = "🔊";
+            notificationSound.currentTime = 0;
+            notificationSound.play().catch(err => {});
+        });
+        const emojis = [
+            "😀","😂","😍","🥰","😘","😎","😏","🥳","😢","😭","😱","😡","😤","🥺","😌",
+            "🔥","❤️","💔","💯","👍","👎","👏","🙌","🙏","👀","🎉","🚀","💪","✨","⭐",
+            "😂","🤣","🥲","😅","😆","😉","😊","😋","😛","😜","🤪","🤩","🥹","😭","😤",
+            "🙂","🙃","🫠","🤔","🤨","😐","😑","😶","🤐","😏","😒","🙄","😬","😮‍💨","🤥",
+            "🍕","🍔","☕","🍺","🎂","🎈","🏆","⚽","🎮","📱","💻","🎥","🎵","📸","🔗"
+        ];
+        const picker = document.getElementById("emoji-picker");
+        emojis.forEach(emo => {
+            const span = document.createElement("span");
+            span.className = "emoji";
+            span.textContent = emo;
+            span.onclick = () => {
+                document.getElementById("msg-input").value += emo;
+                picker.style.display = "none";
+            };
+            picker.appendChild(span);
+        });
+        document.getElementById("emoji-btn").onclick = (e) => {
+            e.stopPropagation();
+            picker.style.display = picker.style.display === "flex" ? "none" : "flex";
+        };
+        document.addEventListener("click", () => picker.style.display = "none");
+        const imageBtn = document.getElementById("image-upload-btn");
+        const imageInput = document.getElementById("image-upload");
+        imageBtn.onclick = () => {
+            if (imageBtn.classList.contains("loading")) return;
+            imageInput.click();
+        };
+        imageInput.onchange = async (e) => {
+            const file = e.target.files[0];
+            if (!file || !isLoggedIn) return;
+            imageBtn.classList.add("loading");
+            try {
+                const reader = new FileReader();
+                const dataUrl = await new Promise((resolve, reject) => {
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+                await sendMessage("", dataUrl);
+            } catch (err) {
+                console.error(err);
+                alert("Σφάλμα κατά την αποστολή της εικόνας.");
+            } finally {
+                imageBtn.classList.remove("loading");
+                imageInput.value = "";
+            }
+        };
+        let isDark = true;
+        document.getElementById("toggle-theme").onclick = () => {
+            isDark = !isDark;
+            document.getElementById("toggle-theme").textContent = isDark ? "🌙" : "☀️";
+            document.body.style.backgroundColor = isDark ? "#000" : "#222233";
+            document.getElementById("chat-wrapper").style.backgroundColor = isDark ? "rgba(0,0,0,0.95)" : "rgba(40,40,60,0.95)";
+        };
     </script>
 </body>
 </html>
