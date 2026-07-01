@@ -429,7 +429,7 @@
                 const visibleMessages = messages.filter(m => {
                     if (activePrivateTarget === null) return !m.to;
                     else return m.to === activePrivateTarget || (m.user === activePrivateTarget && m.to === currentName);
-                });
+                }).slice(-50);
                 
                 visibleMessages.forEach(data => {
                     const isOwn = data.user === currentName;
