@@ -13,6 +13,9 @@ let onlineUsers = {};
 let bannedIPs = new Set();
 let bannedTokens = new Set();
 
+// Λίστα απαγορευμένων ονομάτων
+const forbiddenNames = ["Admin", "Owner", "Boss"]; 
+
 const ADMIN_PASSWORD = "sakis019630";
 
 function getClientIP(req) {
@@ -26,7 +29,6 @@ function isBanned(req, token) {
     return false;
 }
 
-// Keep-alive για Render
 app.get('/ping', (req, res) => res.status(200).send('ok'));
 
 app.get('/', (req, res) => {
@@ -43,6 +45,16 @@ app.post('/api/login', (req, res) => {
 
     let username = loginString.trim();
     let isAdmin = false;
+
+    // ΕΛΕΓΧΟΣ ΑΠΑΓΟΡΕΥΜΕΝΩΝ ΟΝΟΜΑΤΩΝ
+    if (forbiddenNames.includes(username)) {
+        return res.json({ success: false, error: 'Απαγορευμένο όνομα' });
+    }
+
+    // ΕΛΕΓΧΟΣ ΑΝ ΕΙΝΑΙ ΗΔΗ ONLINE (ΔΙΠΛΟΤΥΠΑ)
+    if (onlineUsers[username]) {
+        return res.json({ success: false, error: 'Το όνομα χρησιμοποιείται ήδη' });
+    }
 
     if (username.includes(':')) {
         const parts = username.split(':');
