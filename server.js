@@ -52,6 +52,7 @@ app.post('/api/login', (req, res) => {
     }
 
     // ΕΛΕΓΧΟΣ ΑΝ ΕΙΝΑΙ ΗΔΗ ONLINE (ΔΙΠΛΟΤΥΠΑ)
+    // Ελέγχουμε αν υπάρχει ήδη στο αντικείμενο onlineUsers
     if (onlineUsers[username]) {
         return res.json({ success: false, error: 'Το όνομα χρησιμοποιείται ήδη' });
     }

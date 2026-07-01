@@ -136,7 +136,6 @@
         .emoji:hover { background: #00ff00; color: #000; border-radius: 4px; }
         .back-btn { background: #ff3333; color: white; padding: 4px 10px; height: auto; font-size: 13px; }
 
-        /* === LOADING ΓΙΑ ΕΙΚΟΝΑ === */
         #image-upload-btn {
             position: relative;
             min-width: 52px;
@@ -237,7 +236,6 @@
         };
         function triggerAvatarUpload() { myAvatarInput.click(); }
         
-        // --- ΕΝΟΠΟΙΗΜΕΝΟ INTERFACE ΓΙΑ ΒΕΛΤΙΣΤΟΠΟΙΗΣΗ ---
         async function runUpdates() {
             if (!isLoggedIn) return;
             await Promise.all([updatePresence(), fetchPresence(), fetchMessages()]);
@@ -343,8 +341,8 @@
                 
                 if (!data.success) {
                     if (data.error === 'banned') handleBannedUser();
+                    else alert(data.error); // Εδώ εμφανίζεται το μήνυμα σφάλματος από τον server
                     document.getElementById("username").value = "";
-                    document.getElementById("username").placeholder = "Το όνομά σου...";
                     return;
                 }
                 localStorage.setItem("chatUser", data.username);
