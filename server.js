@@ -36,16 +36,17 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// ENDPOINT ΓΙΑ ΤΟ RESET (Ενημερώνει και το resetVersion)
+// ΔΙΟΡΘΩΜΕΝΟ ENDPOINT ΓΙΑ ΤΟ RESET
 app.post('/api/clear-all', (req, res) => {
     const { adminName } = req.body;
     if (adminName === "sakis") {
         messages = [];
         
-        // Καθαρίζουμε το object, αλλά ξαναβάζουμε τον Sakis μέσα
-        // Υποθέτοντας ότι ο Sakis έχει κάποια δεδομένα (π.χ. avatar)
+        // Κρατάμε τα δεδομένα του Sakis προσωρινά
         let sakisData = onlineUsers["sakis"]; 
+        // Αδειάζουμε το object όλων των χρηστών
         onlineUsers = {}; 
+        // Επαναφέρουμε μόνο τον Sakis
         if (sakisData) onlineUsers["sakis"] = sakisData;
         
         resetVersion++; 
