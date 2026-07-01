@@ -388,8 +388,7 @@
             sendMessage(input.value.trim());
             input.value = "";
         };
-     
-               
+        async function fetchMessages() {
             if (!isLoggedIn || window.isFetching) return;
             window.isFetching = true;
             try {
@@ -400,14 +399,38 @@
                 }
                 
                 const messages = await res.json();
+                let htmlContent = "";
+                let hasIncomingNewPrivate = false;
+                let shouldPlaySound = false;
+                const chatBox = document.getElementById("chat-box");
+
+                messages.forEach(m => {
+                    const isOwn = m.user === currentName;
+                    const isNew = !knownMessageIds.has(m.id);
+                    if (m.avatar && m.user !== currentName) {
+                        globalUsersAvatars[m.user] = m.avatar;
+                    }
+                    if (isNew) {
+                        knownMessageIds.add(m.id);
+                        if (!isOwn && !initialLoad) {
+                            if (!m.to && activePrivateTarget === null) shouldPlaySound = true;
+                            else if (m.to === currentName) shouldPlaySound = true;
+                        }
+                        if (m.to === currentName && m.user !== activePrivateTarget) {
+                            if (!unreadFromUsers.has(m.user)) {
+                                unreadFromUsers.add(m.user);
+                                hasIncomingNewPrivate = true;
+                            }
+                        }
+                    }
+                });
+                if (hasIncomingNewPrivate) fetchPresence();
                 
-                // Επιλογή μόνο των τελευταίων 50 μηνυμάτων
-                const visibleMessages = messages.slice(-50).filter(m => {
+                const visibleMessages = messages.filter(m => {
                     if (activePrivateTarget === null) return !m.to;
                     else return m.to === activePrivateTarget || (m.user === activePrivateTarget && m.to === currentName);
                 });
-
-                let htmlContent = "";
+                
                 visibleMessages.forEach(data => {
                     const isOwn = data.user === currentName;
                     const isPrivate = !!data.to;
@@ -422,10 +445,10 @@
                     htmlContent += `</div></div>`;
                 });
                 
-                const chatBox = document.getElementById("chat-box");
                 const isAtBottom = chatBox.scrollHeight - chatBox.scrollTop - chatBox.clientHeight <= 30;
                 chatBox.innerHTML = htmlContent;
                 if (initialLoad || isAtBottom) chatBox.scrollTop = chatBox.scrollHeight;
+                if (shouldPlaySound) notificationSound.play().catch(e => {});
                 initialLoad = false;
             } catch(e) {} finally { window.isFetching = false; }
         }
