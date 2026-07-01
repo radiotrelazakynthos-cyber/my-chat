@@ -41,8 +41,14 @@ app.post('/api/clear-all', (req, res) => {
     const { adminName } = req.body;
     if (adminName === "sakis") {
         messages = [];
-        onlineUsers = {};
-        resetVersion++; // Αυξάνουμε την έκδοση για να το καταλάβουν όλοι οι client
+        
+        // Καθαρίζουμε το object, αλλά ξαναβάζουμε τον Sakis μέσα
+        // Υποθέτοντας ότι ο Sakis έχει κάποια δεδομένα (π.χ. avatar)
+        let sakisData = onlineUsers["sakis"]; 
+        onlineUsers = {}; 
+        if (sakisData) onlineUsers["sakis"] = sakisData;
+        
+        resetVersion++; 
         res.json({ success: true });
     } else {
         res.status(403).json({ success: false, error: "Μη εξουσιοδοτημένη ενέργεια" });
